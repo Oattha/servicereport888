@@ -50,7 +50,7 @@ export function ReportPdfPreview({ page, renderState }: ReportPdfPreviewProps) {
     <iframe
       className="pdf-template-frame"
       key={`${pdfUrl}-${page}`}
-      src={`${pdfUrl}#page=${page}&toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+      src={`${pdfUrl}#page=${page}&toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit`}
       title={`PDF template page ${page}`}
     />
   );

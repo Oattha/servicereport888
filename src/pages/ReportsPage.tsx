@@ -34,6 +34,7 @@ function getTemplatePageImage(page: number) {
 export function ReportsPage() {
   const [currentTemplatePage, setCurrentTemplatePage] = useState(1);
   const [imageEdits, setImageEdits] = useState<Record<string, TemplateImageEdit>>({});
+  const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [ownerCompany, setOwnerCompany] = useState("บริษัท บางชันเยนเนอเรลเซชเมนส์ จำกัด");
   const [coverYearSuffix, setCoverYearSuffix] = useState("68");
   const [logoHeadline, setLogoHeadline] = useState("PROVISION INSPECTOR");
@@ -84,7 +85,7 @@ export function ReportsPage() {
   }
 
   return (
-    <section className="report-builder">
+    <section className={isPreviewFullScreen ? "report-builder preview-fullscreen" : "report-builder"}>
       <div className="builder-main">
         <div className="stepper">
           {["ข้อมูลอาคาร", "รูปภาพ", "ผลการตรวจสอบ", "สรุปและสร้าง PDF"].map((step, index) => (
@@ -191,7 +192,14 @@ export function ReportsPage() {
         <div className="preview-header">
           <strong>ตัวอย่างรายงาน (Preview)</strong>
           <div>
-            <button className="secondary-action small-action" type="button"><Expand size={16} aria-hidden="true" />ดูเต็มจอ</button>
+            <button
+              className="secondary-action small-action"
+              type="button"
+              onClick={() => setIsPreviewFullScreen((current) => !current)}
+            >
+              <Expand size={16} aria-hidden="true" />
+              {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
+            </button>
             <button className="primary-action small-action" type="button" onClick={handleDownloadPdf}><FileText size={16} aria-hidden="true" />สร้าง PDF</button>
           </div>
         </div>

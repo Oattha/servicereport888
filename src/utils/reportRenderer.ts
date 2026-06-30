@@ -27,12 +27,17 @@ function replaceYearInContentStream(content: Uint8Array, coverYear: string) {
   const firstHalf = normalizedYear.slice(0, 2);
   const secondHalf = normalizedYear.slice(2);
   let yearPartIndex = 0;
-  const updatedContent = decodedContent.replace(/\[\(\d\)0\.8 \(\d\)\]TJ/g, (match) => {
-    yearPartIndex += 1;
-    if (yearPartIndex === 1) return `[(${firstHalf[0]})0.8 (${firstHalf[1]})]TJ`;
-    if (yearPartIndex === 2) return `[(${secondHalf[0]})0.8 (${secondHalf[1]})]TJ`;
-    return match;
-  });
+  const updatedContent = decodedContent
+    .replace(
+      "/TT0 1 Tf\n140.04 -0 0 140.04 306.6782 563.7623 Tm",
+      "/TT1 1 Tf\n140.04 -0 0 140.04 306.6782 563.7623 Tm"
+    )
+    .replace(/\[\(\d\)0\.8 \(\d\)\]TJ/g, (match) => {
+      yearPartIndex += 1;
+      if (yearPartIndex === 1) return `[(${firstHalf[0]})0.8 (${firstHalf[1]})]TJ`;
+      if (yearPartIndex === 2) return `[(${secondHalf[0]})0.8 (${secondHalf[1]})]TJ`;
+      return match;
+    });
 
   return new TextEncoder().encode(updatedContent);
 }

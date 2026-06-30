@@ -1532,6 +1532,10 @@ td small {
   background: #ffffff;
 }
 
+.pdf-template-frame.loading {
+  display: none;
+}
+
 .pdf-preview-loading {
   display: grid;
   width: 100%;

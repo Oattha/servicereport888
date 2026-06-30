@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as pdfjs from "pdfjs-dist";
+import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 import type { ReportRenderState } from "../types";
 import { createReportPdf } from "../utils/reportRenderer";
+
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 type ReportPdfPreviewProps = {
   page: number;
@@ -8,24 +12,31 @@ type ReportPdfPreviewProps = {
 };
 
 export function ReportPdfPreview({ page, renderState }: ReportPdfPreviewProps) {
-  const [pdfUrl, setPdfUrl] = useState<string>("");
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isCurrent = true;
-    let nextUrl = "";
 
     async function renderPdf() {
+      setIsLoading(true);
       const pdfBytes = await createReportPdf(renderState);
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
-      nextUrl = URL.createObjectURL(blob);
-      if (!isCurrent) {
-        URL.revokeObjectURL(nextUrl);
-        return;
-      }
-      setPdfUrl((currentUrl) => {
-        if (currentUrl) URL.revokeObjectURL(currentUrl);
-        return nextUrl;
-      });
+      const documentTask = pdfjs.getDocument({ data: pdfBytes.slice() });
+      const pdfDocument = await documentTask.promise;
+      const pdfPage = await pdfDocument.getPage(page);
+      const viewport = pdfPage.getViewport({ scale: 2 });
+      const canvas = canvasRef.current;
+      if (!canvas || !isCurrent) return;
+      const context = canvas.getContext("2d");
+      if (!context) return;
+
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await pdfPage.render({ canvasContext: context, viewport }).promise;
+      if (!isCurrent) return;
+      canvas.dataset.renderedPage = String(page);
+      canvas.dataset.renderedYear = renderState.coverYear;
+      setIsLoading(false);
     }
 
     void renderPdf();
@@ -33,25 +44,16 @@ export function ReportPdfPreview({ page, renderState }: ReportPdfPreviewProps) {
     return () => {
       isCurrent = false;
     };
-  }, [renderState]);
-
-  useEffect(
-    () => () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    },
-    [pdfUrl]
-  );
-
-  if (!pdfUrl) {
-    return <div className="pdf-preview-loading">กำลังสร้างตัวอย่าง PDF</div>;
-  }
+  }, [page, renderState]);
 
   return (
-    <iframe
-      className="pdf-template-frame"
-      key={`${pdfUrl}-${page}`}
-      src={`${pdfUrl}#page=${page}&toolbar=0&navpanes=0&pagemode=none&view=Fit&zoom=page-fit`}
-      title={`PDF template page ${page}`}
-    />
+    <>
+      {isLoading ? <div className="pdf-preview-loading">กำลังสร้างตัวอย่าง PDF</div> : null}
+      <canvas
+        aria-label={`PDF template page ${page}`}
+        className={isLoading ? "pdf-template-frame loading" : "pdf-template-frame"}
+        ref={canvasRef}
+      />
+    </>
   );
 }

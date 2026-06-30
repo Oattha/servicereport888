@@ -37,10 +37,6 @@ export function ReportsPage() {
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [ownerCompany, setOwnerCompany] = useState("บริษัท บางชันเยนเนอเรลเซชเมนส์ จำกัด");
   const [coverYearSuffix, setCoverYearSuffix] = useState("68");
-  const [logoHeadline, setLogoHeadline] = useState("PROVISION INSPECTOR");
-  const [logoSubline, setLogoSubline] = useState("COMPANYLIMITED");
-  const [logoDetail, setLogoDetail] = useState("บริษัท โปรวิชั่น อินสเปคเตอร์ จำกัด");
-  const [logoWebsite, setLogoWebsite] = useState("www.pvi-inspector.com");
 
   const lockedFieldSummary = useMemo(() => {
     const textFields = templateFields.filter((field) => field.type !== "signature").length;
@@ -62,13 +58,9 @@ export function ReportsPage() {
     () => ({
       coverYear: coverYearText,
       ownerCompany,
-      logoHeadline,
-      logoSubline,
-      logoDetail,
-      logoWebsite,
       imageEdits
     }),
-    [coverYearText, imageEdits, logoDetail, logoHeadline, logoSubline, logoWebsite, ownerCompany]
+    [coverYearText, imageEdits, ownerCompany]
   );
 
   async function handleDownloadPdf() {
@@ -136,22 +128,6 @@ export function ReportsPage() {
             <label className="field full">
               <span>ชื่อบริษัทด้านล่างหน้าปก</span>
               <input value={ownerCompany} onChange={(event) => setOwnerCompany(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>ข้อความโลโก้บรรทัด 1</span>
-              <input value={logoHeadline} onChange={(event) => setLogoHeadline(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>ข้อความโลโก้บรรทัด 2</span>
-              <input value={logoSubline} onChange={(event) => setLogoSubline(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>ชื่อบริษัทข้างโลโก้</span>
-              <input value={logoDetail} onChange={(event) => setLogoDetail(event.target.value)} />
-            </label>
-            <label className="field">
-              <span>เว็บไซต์ข้างโลโก้</span>
-              <input value={logoWebsite} onChange={(event) => setLogoWebsite(event.target.value)} />
             </label>
           </div>
         </section>

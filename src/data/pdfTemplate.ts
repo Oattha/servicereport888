@@ -88,19 +88,6 @@ export const templateFields: TemplateField[] = [
 
 export const imageSlots: TemplateImageSlot[] = [
   {
-    key: "cover_logo",
-    label: "โลโก้ด้านบนหน้าปก",
-    page: 1,
-    type: "image",
-    x: 80,
-    y: 34,
-    width: 410,
-    height: 112,
-    recommendedSize: "พื้นหลังโปร่งใส หรือ 460 x 144 px",
-    xObjectName: "Im1",
-    locked: true
-  },
-  {
     key: "cover_building_photo",
     label: "รูปหน้าอาคารบนหน้าปก",
     page: 1,

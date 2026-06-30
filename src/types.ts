@@ -62,9 +62,5 @@ export type TemplatePageSize = {
 export type ReportRenderState = {
   coverYear: string;
   ownerCompany: string;
-  logoHeadline: string;
-  logoSubline: string;
-  logoDetail: string;
-  logoWebsite: string;
   imageEdits: Record<string, TemplateImageEdit>;
 };

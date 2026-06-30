@@ -1,4 +1,4 @@
-import { decodePDFRawStream, PDFArray, PDFDocument, PDFName, PDFRawStream, PDFStream } from "pdf-lib";
+import { decodePDFRawStream, PDFArray, PDFDocument, PDFName, PDFRawStream, PDFStream, rgb } from "pdf-lib";
 import { imageSlots } from "../data/pdfTemplate";
 import type { ReportRenderState } from "../types";
 import { getCoverFitPlacement } from "./templateEditing";
@@ -87,9 +87,42 @@ async function imageUrlToCoverPngBytes(imageUrl: string, targetWidth: number, ta
 
 async function imageUrlToContainPngBytes(imageUrl: string, targetWidth: number, targetHeight: number) {
   const image = await loadImage(imageUrl);
-  const scale = Math.min(targetWidth / image.naturalWidth, targetHeight / image.naturalHeight);
-  const drawWidth = image.naturalWidth * scale;
-  const drawHeight = image.naturalHeight * scale;
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = image.naturalWidth;
+  sourceCanvas.height = image.naturalHeight;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) throw new Error("Cannot read header logo");
+  sourceContext.drawImage(image, 0, 0);
+  const pixels = sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+  let minX = sourceCanvas.width;
+  let minY = sourceCanvas.height;
+  let maxX = 0;
+  let maxY = 0;
+
+  for (let y = 0; y < sourceCanvas.height; y += 1) {
+    for (let x = 0; x < sourceCanvas.width; x += 1) {
+      const offset = (y * sourceCanvas.width + x) * 4;
+      const alpha = pixels.data[offset + 3];
+      const red = pixels.data[offset];
+      const green = pixels.data[offset + 1];
+      const blue = pixels.data[offset + 2];
+      const isWhite = red > 245 && green > 245 && blue > 245;
+      if (alpha > 10 && !isWhite) {
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  const sourceX = minX < maxX ? minX : 0;
+  const sourceY = minY < maxY ? minY : 0;
+  const sourceWidth = minX < maxX ? maxX - minX + 1 : image.naturalWidth;
+  const sourceHeight = minY < maxY ? maxY - minY + 1 : image.naturalHeight;
+  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
   const canvas = document.createElement("canvas");
   canvas.width = targetWidth;
   canvas.height = targetHeight;
@@ -98,7 +131,17 @@ async function imageUrlToContainPngBytes(imageUrl: string, targetWidth: number, 
 
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, targetWidth, targetHeight);
-  context.drawImage(image, (targetWidth - drawWidth) / 2, (targetHeight - drawHeight) / 2, drawWidth, drawHeight);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    (targetWidth - drawWidth) / 2,
+    (targetHeight - drawHeight) / 2,
+    drawWidth,
+    drawHeight
+  );
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((nextBlob) => {
@@ -111,7 +154,7 @@ async function imageUrlToContainPngBytes(imageUrl: string, targetWidth: number, 
 }
 
 async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderState) {
-  const logoUrl = state.imageEdits.cover_logo?.objectUrl ?? DEFAULT_HEADER_LOGO_URL;
+  const logoUrl = DEFAULT_HEADER_LOGO_URL;
   const coverLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95);
   const headerLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95);
   const coverLogo = await pdf.embedPng(coverLogoBytes);
@@ -123,6 +166,15 @@ async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderSt
     if (!xObjects || typeof xObjects !== "object" || !("set" in xObjects)) return;
 
     xObjects.set(PDFName.of(index === 0 ? "Im1" : "Im0"), index === 0 ? coverLogo.ref : headerLogo.ref);
+
+    if (index === 0) {
+      page.drawRectangle({ x: 28, y: 704, width: 250, height: 68, color: rgb(1, 1, 1) });
+      page.drawImage(coverLogo, { x: 40, y: 713, width: 210, height: 50 });
+      return;
+    }
+
+    page.drawRectangle({ x: 32, y: 742, width: 190, height: 36, color: rgb(1, 1, 1) });
+    page.drawImage(headerLogo, { x: 38, y: 748, width: 165, height: 24 });
   });
 }
 
@@ -133,7 +185,6 @@ async function replacePdfImageXObjects(pdf: PDFDocument, state: ReportRenderStat
   if (!xObjects || typeof xObjects !== "object" || !("set" in xObjects)) return;
 
   for (const slot of imageSlots) {
-    if (slot.key === "cover_logo") continue;
     if (!slot.xObjectName) continue;
     const edit = state.imageEdits[slot.key];
     if (!edit) continue;

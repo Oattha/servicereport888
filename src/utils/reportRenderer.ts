@@ -3,6 +3,7 @@ import { imageSlots } from "../data/pdfTemplate";
 import type { ReportRenderState } from "../types";
 import { getCoverFitPlacement } from "./templateEditing";
 
+const DEFAULT_HEADER_LOGO_URL = "/templates/assets/test-true-header-logo.png";
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -84,6 +85,47 @@ async function imageUrlToCoverPngBytes(imageUrl: string, targetWidth: number, ta
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+async function imageUrlToContainPngBytes(imageUrl: string, targetWidth: number, targetHeight: number) {
+  const image = await loadImage(imageUrl);
+  const scale = Math.min(targetWidth / image.naturalWidth, targetHeight / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare header logo");
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, targetWidth, targetHeight);
+  context.drawImage(image, (targetWidth - drawWidth) / 2, (targetHeight - drawHeight) / 2, drawWidth, drawHeight);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode header logo"));
+    }, "image/png");
+  });
+
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderState) {
+  const logoUrl = state.imageEdits.cover_logo?.objectUrl ?? DEFAULT_HEADER_LOGO_URL;
+  const coverLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95);
+  const headerLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95);
+  const coverLogo = await pdf.embedPng(coverLogoBytes);
+  const headerLogo = await pdf.embedPng(headerLogoBytes);
+
+  pdf.getPages().forEach((page, index) => {
+    const resources = page.node.Resources();
+    const xObjects = resources?.lookup(PDFName.of("XObject"));
+    if (!xObjects || typeof xObjects !== "object" || !("set" in xObjects)) return;
+
+    xObjects.set(PDFName.of(index === 0 ? "Im1" : "Im0"), index === 0 ? coverLogo.ref : headerLogo.ref);
+  });
+}
+
 async function replacePdfImageXObjects(pdf: PDFDocument, state: ReportRenderState) {
   const page = pdf.getPages()[0];
   const resources = page.node.Resources();
@@ -91,6 +133,7 @@ async function replacePdfImageXObjects(pdf: PDFDocument, state: ReportRenderStat
   if (!xObjects || typeof xObjects !== "object" || !("set" in xObjects)) return;
 
   for (const slot of imageSlots) {
+    if (slot.key === "cover_logo") continue;
     if (!slot.xObjectName) continue;
     const edit = state.imageEdits[slot.key];
     if (!edit) continue;
@@ -108,6 +151,7 @@ export async function createReportPdf(state: ReportRenderState) {
   const pdf = await PDFDocument.load(templateBytes);
 
   patchExistingYearText(pdf, state.coverYear);
+  await replaceDefaultHeaderLogos(pdf, state);
   await replacePdfImageXObjects(pdf, state);
 
   return pdf.save();

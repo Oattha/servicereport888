@@ -1,19 +1,14 @@
 import {
-  BarChart3,
   Bell,
-  Building2,
   CalendarPlus,
   FileArchive,
   FileText,
-  FolderOpen,
-  LayoutTemplate,
+  HelpCircle,
   LogOut,
   Menu,
-  Settings,
-  Users,
-  HelpCircle,
   Search,
-  ShieldCheck
+  ShieldCheck,
+  Users
 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AppSection } from "../types";
@@ -26,10 +21,7 @@ type AppShellProps = {
 };
 
 const navItems = [
-  { id: "dashboard", label: "แดชบอร์ด", icon: BarChart3 },
-  { id: "reports", label: "สร้างรายงานใหม่", icon: CalendarPlus },
-  { id: "templates", label: "เทมเพลต", icon: LayoutTemplate },
-  { id: "settings", label: "ตั้งค่าระบบ", icon: Settings }
+  { id: "reports", label: "สร้างรายงานใหม่", icon: CalendarPlus }
 ] as const;
 
 export function AppShell({ activeSection, onNavigate, onLogout, children }: AppShellProps) {
@@ -59,25 +51,29 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
               <span>{label}</span>
             </button>
           ))}
-          <button className="nav-item" type="button">
+          <button
+            className={activeSection === "my-reports" ? "nav-item active" : "nav-item"}
+            type="button"
+            onClick={() => onNavigate("my-reports")}
+          >
             <FileText size={19} aria-hidden="true" />
             <span>รายงานของฉัน</span>
           </button>
-          <button className="nav-item" type="button">
+          <button
+            className={activeSection === "all-reports" ? "nav-item active" : "nav-item"}
+            type="button"
+            onClick={() => onNavigate("all-reports")}
+          >
             <FileArchive size={19} aria-hidden="true" />
             <span>รายงานทั้งหมด</span>
           </button>
-          <span className="nav-group-label">ข้อมูลพื้นฐาน</span>
-          <button className="nav-item" type="button">
-            <Building2 size={19} aria-hidden="true" />
-            <span>ลูกค้า / อาคาร</span>
-          </button>
-          <button className="nav-item" type="button">
-            <FolderOpen size={19} aria-hidden="true" />
-            <span>คลังรูปภาพ</span>
-          </button>
+
           <span className="nav-group-label">ตั้งค่า</span>
-          <button className="nav-item" type="button">
+          <button
+            className={activeSection === "users" ? "nav-item active" : "nav-item"}
+            type="button"
+            onClick={() => onNavigate("users")}
+          >
             <Users size={19} aria-hidden="true" />
             <span>ผู้ใช้งาน</span>
           </button>
@@ -112,10 +108,10 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
             <Bell size={20} aria-hidden="true" />
           </button>
           <div className="user-chip">
-            <span>KN</span>
+            <span>U</span>
             <div>
-              <strong>Kawkan</strong>
-              <small>Administrator</small>
+              <strong>User</strong>
+              <small>Authenticated</small>
             </div>
           </div>
         </header>

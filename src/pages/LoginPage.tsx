@@ -10,7 +10,7 @@ const features = [
 ];
 
 type LoginPageProps = {
-  onLogin: () => void;
+  onLogin: (remember: boolean) => void;
 };
 
 export function LoginPage({ onLogin }: LoginPageProps) {

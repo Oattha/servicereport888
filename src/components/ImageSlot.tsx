@@ -1,4 +1,4 @@
-import { ChangeEvent } from "react";
+import { ChangeEvent, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { TemplateImageEdit, TemplateImageSlot } from "../types";
 
@@ -6,13 +6,25 @@ type ImageSlotProps = {
   slot: TemplateImageSlot;
   edit?: TemplateImageEdit;
   onReplace: (slotKey: string, file: File) => void;
+  hasDefaultImage?: boolean;
 };
 
-export function ImageSlot({ slot, edit, onReplace }: ImageSlotProps) {
+export function ImageSlot({ slot, edit, onReplace, hasDefaultImage = true }: ImageSlotProps) {
+  const [errorMessage, setErrorMessage] = useState("");
+
   function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const hasSupportedType = file.type === "image/jpeg" || file.type === "image/png";
+    const hasSupportedExtension = /\.(?:jpe?g|png)$/i.test(file.name);
+    if (!hasSupportedType || !hasSupportedExtension) {
+      setErrorMessage("รองรับเฉพาะไฟล์ JPG, JPEG และ PNG");
+      event.target.value = "";
+      return;
+    }
+
+    setErrorMessage("");
     onReplace(slot.key, file);
   }
 
@@ -25,13 +37,14 @@ export function ImageSlot({ slot, edit, onReplace }: ImageSlotProps) {
         <strong>{slot.label}</strong>
         <span>หน้า {slot.page} · {slot.recommendedSize}</span>
         <small>แทนที่รูปเดิมในตำแหน่งล็อก: x {slot.x}, y {slot.y}, {slot.width} x {slot.height}</small>
-        <small>{edit ? `ไฟล์ใหม่: ${edit.fileName}` : "ใช้รูปเดิมจาก Template"}</small>
+        <small>{edit ? `ไฟล์ใหม่: ${edit.fileName}` : hasDefaultImage ? "ใช้รูปเดิมจาก Template" : "ยังไม่ได้อัปโหลดรูป"}</small>
       </div>
       <label className="upload-button replace-button">
         <RefreshCw size={16} aria-hidden="true" />
         เปลี่ยนรูป
-        <input type="file" accept="image/*" onChange={handleChange} />
+        <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onChange={handleChange} />
       </label>
+      {errorMessage ? <p className="form-error" role="alert">{errorMessage}</p> : null}
     </article>
   );
 }

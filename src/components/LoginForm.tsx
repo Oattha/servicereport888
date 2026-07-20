@@ -1,20 +1,46 @@
 import { FormEvent, useState } from "react";
-import { LogIn, Lock, User, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, LogIn, Lock, Mail } from "lucide-react";
+import { login } from "../lib/api";
 import { FormInput } from "./FormInput";
 
 type LoginFormProps = {
-  onLogin: () => void;
+  onLogin: (remember: boolean) => void;
 };
 
-export function LoginForm({ onLogin }: LoginFormProps) {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("password");
-  const [remember, setRemember] = useState(true);
-  const [showPassword, setShowPassword] = useState(false);
+const rememberedEmailKey = "service-report-remembered-email";
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+export function LoginForm({ onLogin }: LoginFormProps) {
+  const [email, setEmail] = useState(() => localStorage.getItem(rememberedEmailKey) ?? "");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(() => localStorage.getItem(rememberedEmailKey) !== null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onLogin();
+    setError("");
+
+    if (!email.trim() || !password) {
+      setError("กรุณากรอกอีเมลและรหัสผ่าน");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await login(email.trim(), password);
+      if (remember) {
+        localStorage.setItem(rememberedEmailKey, email.trim());
+      } else {
+        localStorage.removeItem(rememberedEmailKey);
+      }
+      onLogin(remember);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : "เข้าสู่ระบบไม่สำเร็จ");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -25,12 +51,13 @@ export function LoginForm({ onLogin }: LoginFormProps) {
       </div>
 
       <FormInput
-        id="username"
-        label="ชื่อผู้ใช้งาน (Username)"
-        icon={User}
-        value={username}
-        onChange={setUsername}
-        autoComplete="username"
+        id="email"
+        label="อีเมล (Email)"
+        icon={Mail}
+        type="email"
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
       />
 
       <FormInput
@@ -57,9 +84,11 @@ export function LoginForm({ onLogin }: LoginFormProps) {
         <span>จดจำการเข้าสู่ระบบ</span>
       </label>
 
-      <button className="login-button" type="submit">
+      {error ? <p className="form-error">{error}</p> : null}
+
+      <button className="login-button" type="submit" disabled={isSubmitting}>
         <LogIn size={22} strokeWidth={2.4} aria-hidden="true" />
-        <span>เข้าสู่ระบบ</span>
+        <span>{isSubmitting ? "กำลังตรวจสอบ..." : "เข้าสู่ระบบ"}</span>
       </button>
     </form>
   );

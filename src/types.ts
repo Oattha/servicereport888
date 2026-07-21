@@ -1,4 +1,12 @@
 import type { InspectionFrequency } from "./data/inspectionChecklist";
+import type { MaintenancePlanPage7Checks } from "./data/maintenancePlanPage7";
+import type { MaintenancePlanPage8Checks } from "./data/maintenancePlanPage8";
+import type { MaintenancePlanPages9To16Checks } from "./data/maintenancePlanPages9To16";
+import type { MaintenancePlanPage18Values } from "./data/maintenancePlanPage18";
+import type {
+  MaintenancePlanPage19SignatureState,
+  MaintenancePlanPage19Values
+} from "./data/maintenancePlanPage19";
 
 export type AppSection = "reports" | "my-reports" | "all-reports" | "users";
 
@@ -199,6 +207,12 @@ export type ReportTemplateId = "annual-inspection" | "maintenance-plan";
 
 export type ReportRenderState = {
   templateId: ReportTemplateId;
+  maintenancePlanPage7Checks: MaintenancePlanPage7Checks;
+  maintenancePlanPage8Checks: MaintenancePlanPage8Checks;
+  maintenancePlanPages9To16Checks: MaintenancePlanPages9To16Checks;
+  maintenancePlanPage18Values: MaintenancePlanPage18Values;
+  maintenancePlanPage19Values: MaintenancePlanPage19Values;
+  maintenancePlanPage19Signature: MaintenancePlanPage19SignatureState;
   fieldValues: Record<string, string>;
   inspectionChecks: Record<string, InspectionFrequency | null>;
   page14Checks: Page14CheckboxState;

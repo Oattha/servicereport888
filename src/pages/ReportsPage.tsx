@@ -6,7 +6,10 @@ import {
   Expand,
   FileText,
   LockKeyhole,
-  Save
+  Mail,
+  Save,
+  Send,
+  X
 } from "lucide-react";
 import { ImageSlot } from "../components/ImageSlot";
 import { MapLocationField } from "../components/MapLocationField";
@@ -41,6 +44,33 @@ import { defaultPage23Remarks, defaultPage23Results, page23ChecklistItems } from
 import { defaultPage24Remarks, defaultPage24Results, page24ChecklistItems } from "../data/page24Fields";
 import { getSection2EvidencePlacements, toSection2EvidenceSlot } from "../data/page21Evidence";
 import { getReportTemplate, reportTemplates } from "../data/reportTemplates";
+import {
+  defaultMaintenancePlanPage7Checks,
+  maintenancePlanFrequencyOptions,
+  maintenancePlanPage7Items,
+  type MaintenancePlanFrequency,
+  type MaintenancePlanPage7ItemKey
+} from "../data/maintenancePlanPage7";
+import {
+  defaultMaintenancePlanPage8Checks,
+  maintenancePlanPage8Items,
+  type MaintenancePlanPage8ItemKey
+} from "../data/maintenancePlanPage8";
+import {
+  defaultMaintenancePlanPages9To16Checks,
+  maintenancePlanFrequencyPages
+} from "../data/maintenancePlanPages9To16";
+import {
+  defaultMaintenancePlanPage18Values,
+  maintenancePlanPage18Items,
+  type MaintenancePlanPage18Status
+} from "../data/maintenancePlanPage18";
+import {
+  defaultMaintenancePlanPage19Signature,
+  defaultMaintenancePlanPage19Values,
+  maintenancePlanPage19Items,
+  maintenancePlanPage19SignatureSlot
+} from "../data/maintenancePlanPage19";
 import type {
   MapLocationValue,
   Page17PartyFieldKey,
@@ -59,7 +89,7 @@ import { createReportPdf } from "../utils/reportRenderer";
 import { ReplaceImage } from "../utils/templateEditing";
 import { saveReportDraft } from "../lib/reportDrafts";
 import { deleteReportDraft } from "../lib/reportDrafts";
-import { completeReport } from "../lib/api";
+import { completeReport, sendReportEmail } from "../lib/api";
 
 const buildingTypes = [
   "อาคารสูง",
@@ -94,6 +124,18 @@ function getTemplatePageImage(templateId: ReportTemplateId, page: number) {
   return `${template.thumbnailDirectory}/page-${String(sourcePage).padStart(2, "0")}.png`;
 }
 
+function pdfBytesToBase64(pdfBytes: Uint8Array) {
+  const blobPart = new ArrayBuffer(pdfBytes.byteLength);
+  new Uint8Array(blobPart).set(pdfBytes);
+  const blob = new Blob([blobPart], { type: "application/pdf" });
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("ไม่สามารถอ่านไฟล์ PDF ได้"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 type ReportsPageProps = {
   initialDraft?: ReportDraft | null;
   onDraftSaved?: (draft: ReportDraft) => void;
@@ -105,6 +147,11 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [activeDraft, setActiveDraft] = useState<ReportDraft | null>(initialDraft);
   const [draftSaveStatus, setDraftSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [completeSaveStatus, setCompleteSaveStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [completedReportId, setCompletedReportId] = useState<string | null>(null);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState(initialState?.fieldValues.customer_email ?? "");
+  const [emailSendStatus, setEmailSendStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [emailError, setEmailError] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<ReportTemplateId>(
     initialState?.templateId ?? "annual-inspection"
   );
@@ -112,6 +159,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [imageEdits, setImageEdits] = useState<Record<string, TemplateImageEdit>>(initialState?.imageEdits ?? {});
   const [imageRevision, setImageRevision] = useState(0);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     ...defaultTemplateFieldValues,
     ...initialState?.fieldValues
@@ -124,6 +172,44 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [inspectionChecks, setInspectionChecks] = useState<Record<string, InspectionFrequency | null>>(
     { ...defaultInspectionChecks, ...initialState?.inspectionChecks }
   );
+  const [maintenancePlanPage7Checks, setMaintenancePlanPage7Checks] = useState({
+    ...defaultMaintenancePlanPage7Checks,
+    ...initialState?.maintenancePlanPage7Checks
+  });
+  const [maintenancePlanPage8Checks, setMaintenancePlanPage8Checks] = useState({
+    ...defaultMaintenancePlanPage8Checks,
+    ...initialState?.maintenancePlanPage8Checks
+  });
+  const [maintenancePlanPages9To16Checks, setMaintenancePlanPages9To16Checks] = useState({
+    ...defaultMaintenancePlanPages9To16Checks,
+    ...initialState?.maintenancePlanPages9To16Checks
+  });
+  const [maintenancePlanPage18Values, setMaintenancePlanPage18Values] = useState(() =>
+    Object.fromEntries(
+      maintenancePlanPage18Items.map((item) => [
+        item.key,
+        {
+          ...defaultMaintenancePlanPage18Values[item.key],
+          ...initialState?.maintenancePlanPage18Values?.[item.key]
+        }
+      ])
+    )
+  );
+  const [maintenancePlanPage19Values, setMaintenancePlanPage19Values] = useState(() =>
+    Object.fromEntries(
+      maintenancePlanPage19Items.map((item) => [
+        item.key,
+        {
+          ...defaultMaintenancePlanPage19Values[item.key],
+          ...initialState?.maintenancePlanPage19Values?.[item.key]
+        }
+      ])
+    )
+  );
+  const [maintenancePlanPage19Signature, setMaintenancePlanPage19Signature] = useState({
+    ...defaultMaintenancePlanPage19Signature,
+    ...initialState?.maintenancePlanPage19Signature
+  });
   const [page14Checks, setPage14Checks] = useState({ ...defaultPage14Checkboxes, ...initialState?.page14Checks });
   const [page17Owner, setPage17Owner] = useState<Page17PartyOverrides>(initialState?.page17Owner ?? {});
   const [page17Occupant, setPage17Occupant] = useState<Page17PartyOverrides>(initialState?.page17Occupant ?? {});
@@ -208,6 +294,13 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         .filter((group) => group.items.length > 0),
     [currentTemplatePage]
   );
+  const currentMaintenancePlanFrequencyItems = maintenancePlanFrequencyPages[currentTemplatePage] ?? [];
+  const currentMaintenancePlanSummaryItems = currentTemplatePage === 19
+    ? maintenancePlanPage19Items
+    : maintenancePlanPage18Items;
+  const currentMaintenancePlanSummaryValues = currentTemplatePage === 19
+    ? maintenancePlanPage19Values
+    : maintenancePlanPage18Values;
 
   function handleReplaceImage(slotKey: string, file: File) {
     setImageEdits((current) => ReplaceImage(current, slotKey, file));
@@ -233,9 +326,20 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const coverYearText = getFieldValue("cover_year");
   const coverYearSuffix = coverYearText.replace(/\D/g, "").slice(-2);
   const page17CoverDefaults = useMemo(() => getPage17CoverDefaults(fieldValues), [fieldValues]);
+  const pdfFileName = useMemo(() => {
+    if (selectedTemplateId === "maintenance-plan") return "แผนปฏิบัติการตรวจบำรุงรักษาอาคาร.pdf";
+    const namePart = getFieldValue("building_name").trim() || coverYearText || "รายงาน";
+    return `รายงานตรวจสอบอาคาร-${namePart.replace(/[\\/:*?"<>|]/g, "-")}.pdf`;
+  }, [coverYearText, fieldValues, selectedTemplateId]);
   const renderState: ReportRenderState = useMemo(
     () => ({
       templateId: selectedTemplateId,
+      maintenancePlanPage7Checks,
+      maintenancePlanPage8Checks,
+      maintenancePlanPages9To16Checks,
+      maintenancePlanPage18Values,
+      maintenancePlanPage19Values,
+      maintenancePlanPage19Signature,
       fieldValues,
       inspectionChecks,
       page14Checks,
@@ -256,6 +360,12 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     }),
     [
       selectedTemplateId,
+      maintenancePlanPage7Checks,
+      maintenancePlanPage8Checks,
+      maintenancePlanPages9To16Checks,
+      maintenancePlanPage18Values,
+      maintenancePlanPage19Values,
+      maintenancePlanPage19Signature,
       fieldValues,
       imageEdits,
       inspectionChecks,
@@ -285,6 +395,59 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       ...current,
       [key]: current[key] === frequency ? null : frequency
     }));
+  }
+
+  function selectMaintenancePlanFrequency(
+    key: MaintenancePlanPage7ItemKey,
+    frequency: MaintenancePlanFrequency
+  ) {
+    setMaintenancePlanPage7Checks((current) => ({ ...current, [key]: frequency }));
+  }
+
+  function selectMaintenancePlanPage8Frequency(
+    key: MaintenancePlanPage8ItemKey,
+    frequency: MaintenancePlanFrequency
+  ) {
+    setMaintenancePlanPage8Checks((current) => ({ ...current, [key]: frequency }));
+  }
+
+  function selectMaintenancePlanPages9To16Frequency(key: string, frequency: MaintenancePlanFrequency) {
+    setMaintenancePlanPages9To16Checks((current) => ({ ...current, [key]: frequency }));
+  }
+
+  function toggleMaintenancePlanSummaryStatus(
+    page: 18 | 19,
+    key: string,
+    status: Exclude<MaintenancePlanPage18Status, null>
+  ) {
+    const setValues = page === 19 ? setMaintenancePlanPage19Values : setMaintenancePlanPage18Values;
+    setValues((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        status: current[key].status === status ? null : status
+      }
+    }));
+  }
+
+  function updateMaintenancePlanSummaryText(
+    page: 18 | 19,
+    key: string,
+    field: "correction" | "note",
+    value: string
+  ) {
+    const setValues = page === 19 ? setMaintenancePlanPage19Values : setMaintenancePlanPage18Values;
+    setValues((current) => ({
+      ...current,
+      [key]: { ...current[key], [field]: value }
+    }));
+  }
+
+  function updateMaintenancePlanPage19Signature(
+    field: "typedSignature" | "signerName",
+    value: string
+  ) {
+    setMaintenancePlanPage19Signature((current) => ({ ...current, [field]: value }));
   }
 
   function togglePage14Check(key: (typeof page14CheckboxOptions)[number]["key"]) {
@@ -386,10 +549,15 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
 
   async function handleCompleteReport() {
     if (completeSaveStatus === "saving") return;
+    if (completedReportId) {
+      setIsEmailDialogOpen(true);
+      return;
+    }
     setCompleteSaveStatus("saving");
     try {
-      await completeReport({
+      const savedReport = await completeReport({
         ownerCompany: getFieldValue("owner_company"),
+        customerEmail: getFieldValue("customer_email"),
         buildingName: getFieldValue("building_name"),
         buildingAddress: getFieldValue("building_address"),
         templateCode: selectedTemplate.code,
@@ -397,17 +565,54 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         templatePages: selectedTemplate.pages,
         inspectionDate: getFieldValue("inspection_date")
       });
-      if (activeDraft) {
-        try {
-          await deleteReportDraft(activeDraft.id);
-        } catch (draftError) {
-          console.warn("[Completed report saved, but draft cleanup failed]", draftError);
-        }
-      }
-      onReportCompleted?.();
+      setCompletedReportId(savedReport.id);
+      setRecipientEmail(getFieldValue("customer_email"));
+      setEmailSendStatus("idle");
+      setEmailError("");
+      setIsEmailDialogOpen(true);
+      setCompleteSaveStatus("idle");
     } catch (error) {
       console.error("[Complete report failed]", error);
       setCompleteSaveStatus("error");
+    }
+  }
+
+  async function finishReportFlow() {
+    if (activeDraft) {
+      try {
+        await deleteReportDraft(activeDraft.id);
+      } catch (draftError) {
+        console.warn("[Completed report saved, but draft cleanup failed]", draftError);
+      }
+    }
+    onReportCompleted?.();
+  }
+
+  async function handleSendReportEmail() {
+    if (!completedReportId || emailSendStatus === "sending") return;
+    const normalizedEmail = recipientEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setEmailError("กรุณากรอกอีเมลผู้รับให้ถูกต้อง");
+      return;
+    }
+
+    setEmailSendStatus("sending");
+    setEmailError("");
+    try {
+      const pdfBytes = await createReportPdf(renderState);
+      const pdfBase64 = await pdfBytesToBase64(pdfBytes);
+      await sendReportEmail(completedReportId, {
+        recipientEmail: normalizedEmail,
+        fileName: pdfFileName,
+        pdfBase64
+      });
+      setEmailSendStatus("success");
+      window.setTimeout(() => {
+        void finishReportFlow();
+      }, 1400);
+    } catch (error) {
+      setEmailSendStatus("error");
+      setEmailError(error instanceof Error ? error.message : "ส่งรายงานทางอีเมลไม่สำเร็จ");
     }
   }
 
@@ -486,6 +691,15 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               <input
                 value={getFieldValue("owner_company")}
                 onChange={(event) => updateFieldValue("owner_company", event.target.value)}
+              />
+            </label>
+            <label className="field full">
+              <span>อีเมลลูกค้า (สำหรับส่งรายงาน)</span>
+              <input
+                type="email"
+                value={getFieldValue("customer_email")}
+                onChange={(event) => updateFieldValue("customer_email", event.target.value)}
+                placeholder="customer@example.com"
               />
             </label>
             {currentPageTextFields
@@ -1007,6 +1221,228 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         </section>
         ) : null}
         </>
+        ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 7 ? (
+          <section className="builder-card checklist-card maintenance-page7-card">
+            <div className="checklist-header">
+              <span>หน้า 7</span>
+              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
+              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
+            </div>
+            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
+              <span>รายการตรวจบำรุงรักษา</span>
+              {maintenancePlanFrequencyOptions.map((option) => (
+                <strong key={option.key}>{option.label}</strong>
+              ))}
+            </div>
+            <div className="maintenance-frequency-list">
+              {maintenancePlanPage7Items.map((item) => (
+                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
+                  <span>{item.label}</span>
+                  {maintenancePlanFrequencyOptions.map((option) => (
+                    <label className="maintenance-frequency-radio" key={option.key}>
+                      <input
+                        checked={maintenancePlanPage7Checks[item.key] === option.key}
+                        name={`maintenance-page7-${item.key}`}
+                        onChange={() => selectMaintenancePlanFrequency(item.key, option.key)}
+                        type="radio"
+                      />
+                      <span className="maintenance-frequency-control" aria-hidden="true" />
+                      <span className="sr-only">{item.label} {option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 8 ? (
+          <section className="builder-card checklist-card maintenance-page8-card">
+            <div className="checklist-header">
+              <span>หน้า 8</span>
+              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
+              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
+            </div>
+            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
+              <span>รายการตรวจบำรุงรักษา</span>
+              {maintenancePlanFrequencyOptions.map((option) => (
+                <strong key={option.key}>{option.label}</strong>
+              ))}
+            </div>
+            <div className="maintenance-frequency-list">
+              {maintenancePlanPage8Items.map((item) => (
+                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
+                  <span>{item.label}</span>
+                  {maintenancePlanFrequencyOptions.map((option) => (
+                    <label className="maintenance-frequency-radio" key={option.key}>
+                      <input
+                        checked={maintenancePlanPage8Checks[item.key] === option.key}
+                        name={`maintenance-page8-${item.key}`}
+                        onChange={() => selectMaintenancePlanPage8Frequency(item.key, option.key)}
+                        type="radio"
+                      />
+                      <span className="maintenance-frequency-control" aria-hidden="true" />
+                      <span className="sr-only">{item.label} {option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "maintenance-plan"
+          && currentTemplatePage >= 9
+          && currentTemplatePage <= 16 ? (
+          <section className="builder-card checklist-card maintenance-pages9-16-card">
+            <div className="checklist-header">
+              <span>หน้า {currentTemplatePage}</span>
+              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
+              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
+            </div>
+            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
+              <span>รายการตรวจบำรุงรักษา</span>
+              {maintenancePlanFrequencyOptions.map((option) => (
+                <strong key={option.key}>{option.label}</strong>
+              ))}
+            </div>
+            <div className="maintenance-frequency-list">
+              {currentMaintenancePlanFrequencyItems.map((item) => (
+                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
+                  <span>{item.label}</span>
+                  {maintenancePlanFrequencyOptions.map((option) => (
+                    <label className="maintenance-frequency-radio" key={option.key}>
+                      <input
+                        checked={maintenancePlanPages9To16Checks[item.key] === option.key}
+                        name={`maintenance-${item.key}`}
+                        onChange={() => selectMaintenancePlanPages9To16Frequency(item.key, option.key)}
+                        type="radio"
+                      />
+                      <span className="maintenance-frequency-control" aria-hidden="true" />
+                      <span className="sr-only">{item.label} {option.label}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "maintenance-plan"
+          && (currentTemplatePage === 18 || currentTemplatePage === 19) ? (
+          <section className="builder-card maintenance-page18-card">
+            <div className="checklist-header">
+              <span>หน้า {currentTemplatePage}</span>
+              <h2>ตารางสรุปผลการตรวจสอบ</h2>
+              <p>แต่ละรายการเลือกได้เพียง “ใช้ได้” หรือ “ใช้ไม่ได้” และข้อความจะแสดงใน PDF ทางขวาทันที</p>
+            </div>
+            <div
+              className="maintenance-page18-table"
+              role="table"
+              aria-label={`กรอกผลการตรวจสอบหน้าที่ ${currentTemplatePage}`}
+            >
+              <div className="maintenance-page18-row maintenance-page18-head" role="row">
+                <div role="columnheader">รายการตรวจสอบ</div>
+                <div role="columnheader">ใช้ได้</div>
+                <div role="columnheader">ใช้ไม่ได้</div>
+                <div role="columnheader">มีการแก้ไขแล้ว</div>
+                <div role="columnheader">หมายเหตุ</div>
+              </div>
+              {currentMaintenancePlanSummaryItems.map((item, index) => {
+                const value = currentMaintenancePlanSummaryValues[item.key];
+                const showSection = index === 0
+                  || currentMaintenancePlanSummaryItems[index - 1].section !== item.section;
+                return (
+                  <div className="maintenance-page18-row" role="row" key={item.key}>
+                    <div className="maintenance-page18-item" role="cell">
+                      {showSection ? <strong>{item.section}</strong> : null}
+                      <span><b>{item.number}</b>{item.label}</span>
+                    </div>
+                    <div className="maintenance-page18-choice" role="cell">
+                      <input
+                        aria-label={`${item.number} ใช้ได้`}
+                        checked={value.status === "usable"}
+                        name={`maintenance-page${currentTemplatePage}-${item.key}`}
+                        onChange={() => toggleMaintenancePlanSummaryStatus(currentTemplatePage, item.key, "usable")}
+                        type="checkbox"
+                      />
+                    </div>
+                    <div className="maintenance-page18-choice" role="cell">
+                      <input
+                        aria-label={`${item.number} ใช้ไม่ได้`}
+                        checked={value.status === "unusable"}
+                        name={`maintenance-page${currentTemplatePage}-${item.key}`}
+                        onChange={() => toggleMaintenancePlanSummaryStatus(currentTemplatePage, item.key, "unusable")}
+                        type="checkbox"
+                      />
+                    </div>
+                    <div role="cell">
+                      <textarea
+                        aria-label={`${item.number} มีการแก้ไขแล้ว`}
+                        onChange={(event) => updateMaintenancePlanSummaryText(
+                          currentTemplatePage,
+                          item.key,
+                          "correction",
+                          event.target.value
+                        )}
+                        placeholder="พิมพ์รายละเอียด..."
+                        rows={2}
+                        value={value.correction}
+                      />
+                    </div>
+                    <div role="cell">
+                      <textarea
+                        aria-label={`${item.number} หมายเหตุ`}
+                        onChange={(event) => updateMaintenancePlanSummaryText(
+                          currentTemplatePage,
+                          item.key,
+                          "note",
+                          event.target.value
+                        )}
+                        placeholder="พิมพ์หมายเหตุ..."
+                        rows={2}
+                        value={value.note}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {currentTemplatePage === 19 ? (
+              <fieldset className="page25-signature-section maintenance-page19-signature-section">
+                <legend>ลายเซ็นเจ้าของอาคาร / ผู้รับมอบหมาย</legend>
+                <div className="form-grid">
+                  <label className="field">
+                    <span>พิมพ์ลายเซ็น</span>
+                    <input
+                      aria-label="พิมพ์ลายเซ็นหน้า 19"
+                      maxLength={80}
+                      onChange={(event) => updateMaintenancePlanPage19Signature(
+                        "typedSignature",
+                        event.target.value
+                      )}
+                      placeholder="พิมพ์ชื่อหรือลายเซ็น"
+                      value={maintenancePlanPage19Signature.typedSignature}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>ชื่อผู้ลงนามในวงเล็บ</span>
+                    <input
+                      aria-label="ชื่อผู้ลงนามหน้า 19"
+                      maxLength={80}
+                      onChange={(event) => updateMaintenancePlanPage19Signature(
+                        "signerName",
+                        event.target.value
+                      )}
+                      placeholder="ชื่อ-นามสกุล"
+                      value={maintenancePlanPage19Signature.signerName}
+                    />
+                  </label>
+                </div>
+                <ImageSlot
+                  edit={imageEdits.maintenance_page19_signature}
+                  hasDefaultImage={false}
+                  onReplace={handleReplaceImage}
+                  slot={maintenancePlanPage19SignatureSlot}
+                />
+                <small>หากอัปโหลดรูป ระบบจะใช้รูปลายเซ็นแทนข้อความ “พิมพ์ลายเซ็น” ใน PDF</small>
+              </fieldset>
+            ) : null}
+          </section>
         ) : (
           <section className="builder-card template-readonly-card">
             <FileText size={24} aria-hidden="true" />
@@ -1040,9 +1476,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 ? null
                 : <div className="locked-overlay">LOCKED TEMPLATE</div>}
               <ReportPdfPreview
-                key={`${selectedTemplateId}-${currentTemplatePage}-${JSON.stringify(fieldValues)}-${mapLocationRevision}-${imageRevision}`}
                 page={currentTemplatePage}
                 renderState={renderState}
+                zoom={previewZoom}
               />
             </div>
           </div>
@@ -1055,12 +1491,29 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 type="button"
                 onClick={() => setCurrentTemplatePage(page)}
               >
-                <img alt={`PDF template page ${page}`} src={getTemplatePageImage(selectedTemplateId, page)} />
+                <img
+                  alt={`PDF template page ${page}`}
+                  decoding="async"
+                  loading="lazy"
+                  src={getTemplatePageImage(selectedTemplateId, page)}
+                />
                 <span>{page}</span>
               </button>
             ))}
             <div className="zoom-row">
-              <button type="button">-</button><span>100%</span><button type="button">+</button>
+              <button
+                aria-label="ย่อ PDF"
+                disabled={previewZoom <= 75}
+                onClick={() => setPreviewZoom((current) => Math.max(75, current - 25))}
+                type="button"
+              >-</button>
+              <span>{previewZoom}%</span>
+              <button
+                aria-label="ขยาย PDF"
+                disabled={previewZoom >= 200}
+                onClick={() => setPreviewZoom((current) => Math.min(200, current + 25))}
+                type="button"
+              >+</button>
             </div>
             <button className="secondary-action small-action" type="button" onClick={handleDownloadPdf}><Download size={16} aria-hidden="true" />ดาวน์โหลดร่าง</button>
           </div>
@@ -1104,6 +1557,88 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
           {completeSaveStatus === "error" ? <span className="footer-error">บันทึกรายงานไม่สำเร็จ</span> : null}
         </div>
       </div>
+
+      {isEmailDialogOpen ? (
+        <div className="modal-backdrop report-email-backdrop" role="presentation">
+          <section aria-labelledby="send-report-title" aria-modal="true" className="user-modal report-email-modal" role="dialog">
+            <div className="modal-header">
+              <div>
+                <h2 id="send-report-title">ส่งรายงานให้ลูกค้า</h2>
+                <p>ตรวจสอบอีเมลผู้รับและไฟล์ PDF ก่อนส่งรายงาน</p>
+              </div>
+              <button
+                aria-label="ปิด"
+                className="icon-button"
+                disabled={emailSendStatus === "sending"}
+                onClick={() => setIsEmailDialogOpen(false)}
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {emailSendStatus === "success" ? (
+              <div className="report-email-success" role="status">
+                <span><Check size={26} aria-hidden="true" /></span>
+                <h3>ส่งรายงานสำเร็จแล้ว</h3>
+                <p>ส่งไฟล์ไปยัง {recipientEmail.trim()} เรียบร้อย กำลังพาไปหน้า “รายงานของฉัน”</p>
+              </div>
+            ) : (
+              <>
+                <label className="field full">
+                  <span>อีเมลผู้รับ</span>
+                  <div className="report-email-input">
+                    <Mail size={18} aria-hidden="true" />
+                    <input
+                      autoFocus
+                      type="email"
+                      value={recipientEmail}
+                      onChange={(event) => {
+                        setRecipientEmail(event.target.value);
+                        setEmailError("");
+                      }}
+                      placeholder="customer@example.com"
+                    />
+                  </div>
+                </label>
+
+                <div className="report-file-card">
+                  <FileText size={28} aria-hidden="true" />
+                  <div>
+                    <strong>{pdfFileName}</strong>
+                    <span>{selectedTemplate.pages} หน้า</span>
+                  </div>
+                </div>
+
+                <p className="report-email-notice">
+                  ระบบจะส่งรายงานไปยัง <strong>{recipientEmail.trim() || "example@email.com"}</strong>
+                </p>
+                {emailError ? <p className="report-email-error" role="alert">{emailError}</p> : null}
+
+                <div className="modal-actions report-email-actions">
+                  <button
+                    className="secondary-action"
+                    disabled={emailSendStatus === "sending"}
+                    onClick={() => void finishReportFlow()}
+                    type="button"
+                  >
+                    บันทึกไว้ก่อน / ยังไม่ส่ง
+                  </button>
+                  <button
+                    className="primary-action"
+                    disabled={emailSendStatus === "sending"}
+                    onClick={() => void handleSendReportEmail()}
+                    type="button"
+                  >
+                    <Send size={17} aria-hidden="true" />
+                    {emailSendStatus === "sending" ? "กำลังสร้างและส่ง PDF..." : "ส่งรายงานทางอีเมล"}
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

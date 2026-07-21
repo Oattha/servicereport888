@@ -70,6 +70,7 @@ export function resolveGoogleMapsUrl(url: string) {
 
 export type CompleteReportInput = {
   ownerCompany: string;
+  customerEmail: string;
   buildingName: string;
   buildingAddress: string;
   templateCode: string;
@@ -85,6 +86,19 @@ export function getReports() {
 
 export function completeReport(input: CompleteReportInput) {
   return request<SharedReport>("/api/reports", {
+    method: "POST",
+    body: JSON.stringify(input)
+  });
+}
+
+export type SendReportEmailInput = {
+  recipientEmail: string;
+  fileName: string;
+  pdfBase64: string;
+};
+
+export function sendReportEmail(reportId: string, input: SendReportEmailInput) {
+  return request<{ ok: true; recipientEmail: string; sentAt: string }>(`/api/reports/${reportId}/email`, {
     method: "POST",
     body: JSON.stringify(input)
   });

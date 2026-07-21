@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import bcrypt from "bcryptjs";
+import nodemailer from "nodemailer";
 import { randomUUID } from "node:crypto";
 import { pool } from "./db";
 
@@ -8,7 +9,7 @@ const app = express();
 const port = Number(process.env.API_PORT ?? 3001);
 
 app.use(cors({ origin: process.env.WEB_ORIGIN ?? "http://127.0.0.1:5173" }));
-app.use(express.json());
+app.use(express.json({ limit: "30mb" }));
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true });
@@ -185,6 +186,7 @@ app.get("/api/reports", async (_request, response) => {
 app.post("/api/reports", async (request, response) => {
   const {
     ownerCompany,
+    customerEmail,
     buildingName,
     buildingAddress,
     templateCode,
@@ -194,6 +196,7 @@ app.post("/api/reports", async (request, response) => {
     inspectorId
   } = request.body as {
     ownerCompany?: string;
+    customerEmail?: string;
     buildingName?: string;
     buildingAddress?: string;
     templateCode?: string;
@@ -211,8 +214,8 @@ app.post("/api/reports", async (request, response) => {
   try {
     await client.query("BEGIN");
     const customerResult = await client.query(
-      "INSERT INTO customers (name) VALUES ($1) RETURNING id",
-      [ownerCompany.trim()]
+      "INSERT INTO customers (name, email) VALUES ($1, $2) RETURNING id",
+      [ownerCompany.trim(), customerEmail?.trim() || null]
     );
     const customerId = customerResult.rows[0].id;
     const buildingResult = await client.query(
@@ -279,6 +282,83 @@ app.post("/api/reports", async (request, response) => {
   } finally {
     client.release();
   }
+});
+
+app.post("/api/reports/:id/email", async (request, response) => {
+  const { recipientEmail, fileName, pdfBase64 } = request.body as {
+    recipientEmail?: string;
+    fileName?: string;
+    pdfBase64?: string;
+  };
+  const normalizedEmail = recipientEmail?.trim().toLowerCase() ?? "";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return response.status(400).json({ message: "กรุณากรอกอีเมลผู้รับให้ถูกต้อง" });
+  }
+  if (!fileName?.trim() || !pdfBase64) {
+    return response.status(400).json({ message: "ไม่พบไฟล์ PDF สำหรับส่งอีเมล" });
+  }
+
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = Number(process.env.SMTP_PORT ?? 587);
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
+
+  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+    return response.status(503).json({
+      message: "ยังไม่ได้ตั้งค่าระบบส่งอีเมล กรุณากำหนด SMTP_HOST, SMTP_USER, SMTP_PASS และ SMTP_FROM"
+    });
+  }
+
+  const reportResult = await pool.query(
+    `
+      SELECT reports.id, reports.report_no, customers.name AS customer, buildings.name AS building
+      FROM reports
+      LEFT JOIN customers ON customers.id = reports.customer_id
+      LEFT JOIN buildings ON buildings.id = reports.building_id
+      WHERE reports.id = $1
+      LIMIT 1
+    `,
+    [request.params.id]
+  );
+  const report = reportResult.rows[0];
+  if (!report) {
+    return response.status(404).json({ message: "ไม่พบรายงานที่ต้องการส่ง" });
+  }
+
+  const attachment = Buffer.from(pdfBase64, "base64");
+  if (attachment.length === 0 || attachment.length > 25 * 1024 * 1024) {
+    return response.status(400).json({ message: "ไฟล์ PDF ไม่ถูกต้องหรือมีขนาดเกิน 25 MB" });
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: { user: smtpUser, pass: smtpPass }
+  });
+
+  try {
+    await transporter.sendMail({
+      from: smtpFrom,
+      to: normalizedEmail,
+      subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
+      text: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
+      attachments: [{ filename: fileName.trim(), content: attachment, contentType: "application/pdf" }]
+    });
+  } catch (error) {
+    console.error("[Send report email failed]", error);
+    return response.status(502).json({ message: "ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า SMTP แล้วลองอีกครั้ง" });
+  }
+
+  const sentAt = new Date();
+  await pool.query(
+    `UPDATE reports SET status = 'sent', recipient_email = $2, email_sent_at = $3, updated_at = NOW() WHERE id = $1`,
+    [request.params.id, normalizedEmail, sentAt]
+  );
+
+  return response.json({ ok: true, recipientEmail: normalizedEmail, sentAt: sentAt.toISOString() });
 });
 
 app.get("/api/templates", async (_request, response) => {

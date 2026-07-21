@@ -60,9 +60,14 @@ CREATE TABLE IF NOT EXISTS reports (
   status VARCHAR(30) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'ready', 'sent')),
   progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   inspection_date DATE,
+  recipient_email VARCHAR(180),
+  email_sent_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(180);
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);

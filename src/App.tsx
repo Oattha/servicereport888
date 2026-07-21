@@ -59,7 +59,7 @@ export function App() {
       <ReportsPage
         initialDraft={editingDraft}
         key={editingDraft?.id ?? "new-report"}
-        onReportCompleted={() => setActiveSection("all-reports")}
+        onReportCompleted={() => setActiveSection("my-reports")}
       />
     ),
     "my-reports": <MyReportsPage onCreateReport={startNewReport} onEditDraft={editDraft} />,

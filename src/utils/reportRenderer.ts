@@ -14,6 +14,19 @@ import { page18CheckboxOptions, page18MaterialRows } from "../data/page18Fields"
 import { page23ChecklistItems } from "../data/page23Fields";
 import { page24ChecklistItems } from "../data/page24Fields";
 import { getSection2EvidencePlacements, type Section2EvidencePlacement } from "../data/page21Evidence";
+import {
+  maintenancePlanFrequencyOptions,
+  maintenancePlanPage7Items,
+  type MaintenancePlanFrequency
+} from "../data/maintenancePlanPage7";
+import { maintenancePlanPage8Items } from "../data/maintenancePlanPage8";
+import { maintenancePlanFrequencyPages } from "../data/maintenancePlanPages9To16";
+import {
+  maintenancePlanPage18Items,
+  type MaintenancePlanPage18Item,
+  type MaintenancePlanPage18Values
+} from "../data/maintenancePlanPage18";
+import { maintenancePlanPage19Items } from "../data/maintenancePlanPage19";
 import { annualInspectionTemplate, imageSlots } from "../data/pdfTemplate";
 import type { ReportRenderState } from "../types";
 import { getCoverFitPlacement } from "./templateEditing";
@@ -1262,7 +1275,7 @@ async function createSection2EvidenceTextOverlayBytes(
       context.fillText("ยังไม่ได้อัปโหลดรูป", relativeCenterX, relativeImageCenterY);
     }
 
-    let fontSize = placement.columns === 3 ? 12 : 15;
+    let fontSize = 15;
     let lines: string[] = [];
     do {
       context.font = `700 ${fontSize * scale}px "Section2EvidenceCordiaNew"`;
@@ -2011,13 +2024,923 @@ async function replaceDefaultCoverBuildingPhoto(pdf: PDFDocument, state: ReportR
   xObjects.set(PDFName.of("Im0"), image.ref);
 }
 
+function replaceMaintenancePlanPage7Checks(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[6];
+  if (!page) return;
+
+  const columnBounds: Record<MaintenancePlanFrequency, readonly [number, number]> = {
+    two_week: [227.25, 273.75],
+    one_month: [273.75, 320.25],
+    three_month: [320.25, 369],
+    six_month: [369, 411],
+    annual: [411, 456.75]
+  };
+  const rowBoundsFromTop: Array<readonly [number, number]> = [
+    [238.7192, 286.7192],
+    [286.7192, 334.7192],
+    [334.7192, 380.3192],
+    [380.3192, 425.9193],
+    [425.9193, 453.5193],
+    [453.5193, 481.1193],
+    [481.1193, 508.7192]
+  ];
+  const { height: pageHeight } = page.getSize();
+
+  maintenancePlanPage7Items.forEach((item, rowIndex) => {
+    const [top, bottom] = rowBoundsFromTop[rowIndex];
+    const cellY = pageHeight - bottom;
+    const cellHeight = bottom - top;
+
+    maintenancePlanFrequencyOptions.forEach((option) => {
+      const [left, right] = columnBounds[option.key];
+      page.drawRectangle({
+        x: left + 1.2,
+        y: cellY + 1.2,
+        width: right - left - 2.4,
+        height: cellHeight - 2.4,
+        color: rgb(1, 1, 1)
+      });
+    });
+
+    const selectedFrequency = state.maintenancePlanPage7Checks[item.key];
+    const [selectedLeft, selectedRight] = columnBounds[selectedFrequency];
+    const centerX = (selectedLeft + selectedRight) / 2;
+    const centerY = cellY + cellHeight / 2;
+    const lineColor = rgb(0.08, 0.08, 0.08);
+    page.drawLine({
+      start: { x: centerX - 4.2, y: centerY },
+      end: { x: centerX - 1.1, y: centerY - 3.1 },
+      thickness: 1.05,
+      color: lineColor
+    });
+    page.drawLine({
+      start: { x: centerX - 1.1, y: centerY - 3.1 },
+      end: { x: centerX + 5.2, y: centerY + 4.4 },
+      thickness: 1.05,
+      color: lineColor
+    });
+  });
+}
+
+function replaceMaintenancePlanPage8Checks(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[7];
+  if (!page) return;
+
+  const columnBounds: Record<MaintenancePlanFrequency, readonly [number, number]> = {
+    two_week: [227.25, 273.75],
+    one_month: [273.75, 320.25],
+    three_month: [320.25, 369],
+    six_month: [369, 411],
+    annual: [411, 456.75]
+  };
+  const rowBoundsFromTop: Array<readonly [number, number]> = [
+    [196.071, 223.6711],
+    [223.6711, 269.2711],
+    [269.2711, 314.8711],
+    [342.4711, 381.3211],
+    [381.3211, 422.5711],
+    [422.5711, 450.1711],
+    [493.8211, 536.5711],
+    [564.1711, 612.3211]
+  ];
+  const { height: pageHeight } = page.getSize();
+
+  maintenancePlanPage8Items.forEach((item, rowIndex) => {
+    const [top, bottom] = rowBoundsFromTop[rowIndex];
+    const cellY = pageHeight - bottom;
+    const cellHeight = bottom - top;
+
+    maintenancePlanFrequencyOptions.forEach((option) => {
+      const [left, right] = columnBounds[option.key];
+      page.drawRectangle({
+        x: left + 1.2,
+        y: cellY + 1.2,
+        width: right - left - 2.4,
+        height: cellHeight - 2.4,
+        color: rgb(1, 1, 1)
+      });
+    });
+
+    const selectedFrequency = state.maintenancePlanPage8Checks[item.key];
+    const [selectedLeft, selectedRight] = columnBounds[selectedFrequency];
+    const centerX = (selectedLeft + selectedRight) / 2;
+    const centerY = cellY + cellHeight / 2;
+    const lineColor = rgb(0.08, 0.08, 0.08);
+    page.drawLine({
+      start: { x: centerX - 4.2, y: centerY },
+      end: { x: centerX - 1.1, y: centerY - 3.1 },
+      thickness: 1.05,
+      color: lineColor
+    });
+    page.drawLine({
+      start: { x: centerX - 1.1, y: centerY - 3.1 },
+      end: { x: centerX + 5.2, y: centerY + 4.4 },
+      thickness: 1.05,
+      color: lineColor
+    });
+  });
+}
+
+function replaceMaintenancePlanPages9To16Checks(pdf: PDFDocument, state: ReportRenderState) {
+  const columnBounds: Record<MaintenancePlanFrequency, readonly [number, number]> = {
+    two_week: [227.25, 273.75],
+    one_month: [273.75, 320.25],
+    three_month: [320.25, 369],
+    six_month: [369, 411],
+    annual: [411, 456.75]
+  };
+
+  for (let pageNumber = 9; pageNumber <= 16; pageNumber += 1) {
+    const page = pdf.getPages()[pageNumber - 1];
+    if (!page) continue;
+    const { height: pageHeight } = page.getSize();
+
+    for (const item of maintenancePlanFrequencyPages[pageNumber] ?? []) {
+      const cellY = pageHeight - item.bottom;
+      const cellHeight = item.bottom - item.top;
+
+      maintenancePlanFrequencyOptions.forEach((option) => {
+        const [left, right] = columnBounds[option.key];
+        page.drawRectangle({
+          x: left + 1.2,
+          y: cellY + 1.2,
+          width: right - left - 2.4,
+          height: cellHeight - 2.4,
+          color: rgb(1, 1, 1)
+        });
+      });
+
+      const selectedFrequency = state.maintenancePlanPages9To16Checks[item.key];
+      if (!selectedFrequency) continue;
+      const [selectedLeft, selectedRight] = columnBounds[selectedFrequency];
+      const centerX = (selectedLeft + selectedRight) / 2;
+      const centerY = cellY + cellHeight / 2;
+      const lineColor = rgb(0.08, 0.08, 0.08);
+      page.drawLine({
+        start: { x: centerX - 4.2, y: centerY },
+        end: { x: centerX - 1.1, y: centerY - 3.1 },
+        thickness: 1.05,
+        color: lineColor
+      });
+      page.drawLine({
+        start: { x: centerX - 1.1, y: centerY - 3.1 },
+        end: { x: centerX + 5.2, y: centerY + 4.4 },
+        thickness: 1.05,
+        color: lineColor
+      });
+    }
+  }
+
+  const page9 = pdf.getPages()[8];
+  if (page9) {
+    const { height: pageHeight } = page9.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 84.6961;
+    const frequencyHeaderBottom = 119.4961;
+    const tableHeaderBottom = 165.0961;
+    const bodyRowBounds = [
+      192.6962,
+      220.2961,
+      247.8961,
+      275.4962,
+      303.0961,
+      330.6961,
+      358.2961,
+      385.8961,
+      413.4962,
+      441.0961,
+      468.6961,
+      496.2961,
+      539.4962,
+      567.0961,
+      594.6961,
+      622.2961,
+      658.2961,
+      685.8961
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page9.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page9.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+  const page10 = pdf.getPages()[9];
+  if (page10) {
+    const { height: pageHeight } = page10.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 84.6964;
+    const frequencyHeaderBottom = 119.4964;
+    const tableHeaderBottom = 165.0964;
+    const bodyRowBounds = [
+      192.6964,
+      220.2964,
+      247.8964,
+      275.4965,
+      303.0964,
+      330.6964,
+      358.2964,
+      402.2465,
+      446.4965,
+      474.0964,
+      513.9965,
+      552.2465,
+      579.8464,
+      607.4465,
+      635.0464,
+      662.6464,
+      698.6464
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page10.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page10.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+  const page11 = pdf.getPages()[10];
+  if (page11) {
+    const { height: pageHeight } = page11.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+
+    const drawTableGrid = (
+      tableTop: number,
+      frequencyHeaderBottom: number,
+      tableHeaderBottom: number,
+      bodyRowBounds: number[]
+    ) => {
+      const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+      const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+        page11.drawLine({
+          start: { x: fromX, y: toPdfY(distanceFromTop) },
+          end: { x: toX, y: toPdfY(distanceFromTop) },
+          thickness: lineThickness,
+          color: lineColor
+        });
+      };
+      const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+        page11.drawLine({
+          start: { x, y: toPdfY(fromTop) },
+          end: { x, y: toPdfY(toBottom) },
+          thickness: lineThickness,
+          color: lineColor
+        });
+      };
+
+      drawHorizontal(tableLeft, tableRight, tableTop);
+      drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+      drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+      bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+      [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+        .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+      frequencyBounds.slice(1, -1)
+        .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+    };
+
+    drawTableGrid(57.4443, 92.2443, 137.8443, [
+      165.4443,
+      206.2443,
+      233.8443,
+      261.4443,
+      304.0443,
+      331.6443,
+      359.2443,
+      386.8443,
+      414.4443
+    ]);
+    drawTableGrid(444.744, 479.544, 525.144, [
+      552.744,
+      596.244,
+      623.844,
+      668.2439,
+      711.6
+    ]);
+  }
+
+  const page12 = pdf.getPages()[11];
+  if (page12) {
+    const { height: pageHeight } = page12.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 52.9443;
+    const frequencyHeaderBottom = 87.7443;
+    const tableHeaderBottom = 133.3442;
+    const bodyRowBounds = [
+      175.4943,
+      203.0942,
+      245.3942,
+      288.8943,
+      331.4943,
+      359.0942,
+      386.6942,
+      430.6443,
+      458.2443,
+      485.8442,
+      513.4442,
+      541.0443,
+      568.6442,
+      596.2443,
+      623.8442,
+      651.4443,
+      687.4443,
+      715.0443
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page12.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page12.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+  const page13 = pdf.getPages()[12];
+  if (page13) {
+    const { height: pageHeight } = page13.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 60.8194;
+    const frequencyHeaderBottom = 95.6194;
+    const tableHeaderBottom = 141.2194;
+    const bodyRowBounds = [
+      168.8195,
+      196.4194,
+      224.0194,
+      251.6194,
+      294.2194,
+      339.3694,
+      366.9694,
+      394.5694,
+      422.1694,
+      449.7694,
+      477.3694,
+      504.9694,
+      532.5694,
+      560.1694,
+      606.5194,
+      634.1194,
+      661.7194
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page13.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page13.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+  const page15 = pdf.getPages()[14];
+  if (page15) {
+    const { height: pageHeight } = page15.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 57.4444;
+    const frequencyHeaderBottom = 92.2444;
+    const tableHeaderBottom = 137.8444;
+    const bodyRowBounds = [
+      165.4445,
+      241.4155,
+      302.047,
+      344.6786,
+      393.9418,
+      421.5418,
+      449.1418,
+      476.7419,
+      504.3418,
+      531.9418,
+      573.9418,
+      601.5418,
+      645.9418,
+      673.5418,
+      701.1418,
+      728.7418
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page15.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page15.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+  const page16 = pdf.getPages()[15];
+  if (page16) {
+    const { height: pageHeight } = page16.getSize();
+    const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+    const lineColor = rgb(0, 0, 0);
+    const lineThickness = 0.85;
+    const tableLeft = 36.75;
+    const sequenceRight = 75;
+    const itemRight = 228.75;
+    const frequencyBounds = [228.75, 273.75, 320.25, 369, 411, 456.75];
+    const tableRight = 522.75;
+    const tableTop = 54.0693;
+    const frequencyHeaderBottom = 88.8693;
+    const tableHeaderBottom = 134.4693;
+    const bodyRowBounds = [
+      162.0693,
+      189.6693,
+      217.2693,
+      244.8693,
+      290.8566,
+      318.4565,
+      359.7693,
+      387.3693,
+      414.9693,
+      442.5693,
+      470.1693,
+      497.7693,
+      525.3693,
+      563.6821,
+      601.9321,
+      642.4321,
+      678.4321,
+      714.4321
+    ];
+    const bodyBottom = bodyRowBounds[bodyRowBounds.length - 1];
+
+    const drawHorizontal = (fromX: number, toX: number, distanceFromTop: number) => {
+      page16.drawLine({
+        start: { x: fromX, y: toPdfY(distanceFromTop) },
+        end: { x: toX, y: toPdfY(distanceFromTop) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+    const drawVertical = (x: number, fromTop: number, toBottom: number) => {
+      page16.drawLine({
+        start: { x, y: toPdfY(fromTop) },
+        end: { x, y: toPdfY(toBottom) },
+        thickness: lineThickness,
+        color: lineColor
+      });
+    };
+
+    drawHorizontal(tableLeft, tableRight, tableTop);
+    drawHorizontal(itemRight, frequencyBounds[frequencyBounds.length - 1], frequencyHeaderBottom);
+    drawHorizontal(tableLeft, tableRight, tableHeaderBottom);
+    bodyRowBounds.forEach((rowBottom) => drawHorizontal(tableLeft, tableRight, rowBottom));
+
+    [tableLeft, sequenceRight, itemRight, frequencyBounds[frequencyBounds.length - 1], tableRight]
+      .forEach((x) => drawVertical(x, tableTop, bodyBottom));
+    frequencyBounds.slice(1, -1)
+      .forEach((x) => drawVertical(x, frequencyHeaderBottom, bodyBottom));
+  }
+
+}
+
+function getMaintenancePlanPage18CanvasLines(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+) {
+  const lines: string[] = [];
+  for (const paragraph of text.split(/\r?\n/)) {
+    if (!paragraph) {
+      lines.push("");
+      continue;
+    }
+    let line = "";
+    for (const character of Array.from(paragraph)) {
+      const nextLine = `${line}${character}`;
+      if (line && context.measureText(nextLine).width > maxWidth) {
+        lines.push(line);
+        line = character;
+      } else {
+        line = nextLine;
+      }
+    }
+    if (line) lines.push(line);
+  }
+  return lines;
+}
+
+function drawMaintenancePlanPage18CellText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  centerTop: number,
+  width: number,
+  scale: number
+) {
+  const normalizedText = text.trim();
+  if (!normalizedText) return;
+
+  const maxTextHeight = 17;
+  const minimumFontSize = 8;
+  let fontSize = 13.5;
+  let lines: string[] = [];
+  let lineHeight = fontSize;
+  do {
+    context.font = `${fontSize * scale}px "MaintenancePage18CordiaNew"`;
+    lines = getMaintenancePlanPage18CanvasLines(context, normalizedText, (width - 4) * scale);
+    lineHeight = fontSize;
+    if (lines.length * lineHeight <= maxTextHeight || fontSize <= minimumFontSize) break;
+    fontSize -= 0.5;
+  } while (fontSize >= minimumFontSize);
+
+  context.save();
+  context.beginPath();
+  context.rect(
+    (centerX - width / 2 + 2) * scale,
+    (centerTop - maxTextHeight / 2) * scale,
+    (width - 4) * scale,
+    maxTextHeight * scale
+  );
+  context.clip();
+  const firstBaseline = centerTop - ((lines.length - 1) * lineHeight) / 2;
+  lines.forEach((line, index) => {
+    context.fillText(
+      line,
+      Math.round(centerX * scale),
+      Math.round((firstBaseline + index * lineHeight) * scale)
+    );
+  });
+  context.restore();
+}
+
+async function createMaintenancePlanSummaryTextOverlayBytes(
+  items: MaintenancePlanPage18Item[],
+  values: MaintenancePlanPage18Values
+) {
+  const scale = 6;
+  const canvas = document.createElement("canvas");
+  canvas.width = 540 * scale;
+  canvas.height = 780 * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare maintenance plan summary text overlay");
+  const font = new FontFace("MaintenancePage18CordiaNew", 'local("Cordia New")');
+  await font.load();
+  document.fonts.add(font);
+  context.fillStyle = "#000000";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.textRendering = "geometricPrecision";
+
+  items.forEach((item) => {
+    const value = values[item.key];
+    if (!value) return;
+    drawMaintenancePlanPage18CellText(context, value.correction, 427, item.centerTop, 60, scale);
+    drawMaintenancePlanPage18CellText(context, value.note, 490, item.centerTop, 66, scale);
+  });
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode maintenance plan summary text overlay"));
+    }, "image/png");
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function replaceMaintenancePlanSummaryPageValues(
+  pdf: PDFDocument,
+  pageIndex: number,
+  items: MaintenancePlanPage18Item[],
+  values: MaintenancePlanPage18Values,
+  tableTop: number,
+  tableHeaderBottom: number,
+  tableBottom: number
+) {
+  const page = pdf.getPages()[pageIndex];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+  const bodyTop = tableHeaderBottom + 1;
+  const bodyBottom = tableBottom;
+  const cellColumns = [
+    { left: 347.4, right: 369.7 },
+    { left: 370.3, right: 396.7 },
+    { left: 397.3, right: 456.7 },
+    { left: 457.3, right: 522.6 }
+  ];
+
+  cellColumns.forEach(({ left, right }) => {
+    page.drawRectangle({
+      x: left,
+      y: pageHeight - bodyBottom,
+      width: right - left,
+      height: bodyBottom - bodyTop,
+      color: rgb(1, 1, 1)
+    });
+  });
+
+  items.forEach((item) => {
+    const status = values[item.key]?.status;
+    if (!status) return;
+    drawPage23CheckMark(
+      page,
+      status === "usable" ? 358.5 : 383.5,
+      pageHeight - item.centerTop
+    );
+  });
+
+  const hasText = items.some((item) => {
+    const value = values[item.key];
+    return Boolean(value?.correction.trim() || value?.note.trim());
+  });
+  if (hasText) {
+    const overlayBytes = await createMaintenancePlanSummaryTextOverlayBytes(items, values);
+    const overlay = await pdf.embedPng(overlayBytes);
+    page.drawImage(overlay, { x: 0, y: 0, width: 540, height: 780 });
+  }
+
+  const toPdfY = (distanceFromTop: number) => pageHeight - distanceFromTop;
+  const lineColor = rgb(0, 0, 0);
+  const lineThickness = 0.85;
+  const tableLeft = 37.0257;
+  const columnBounds = [65.0323, 347.4419, 370.8837, 397.6744, 457.5484];
+  const tableRight = 523.7419;
+  const drawHorizontal = (distanceFromTop: number) => {
+    page.drawLine({
+      start: { x: tableLeft, y: toPdfY(distanceFromTop) },
+      end: { x: tableRight, y: toPdfY(distanceFromTop) },
+      thickness: lineThickness,
+      color: lineColor
+    });
+  };
+  const drawVertical = (x: number) => {
+    page.drawLine({
+      start: { x, y: toPdfY(tableTop) },
+      end: { x, y: toPdfY(tableBottom) },
+      thickness: lineThickness,
+      color: lineColor
+    });
+  };
+
+  [tableTop, tableHeaderBottom, tableBottom].forEach(drawHorizontal);
+  [tableLeft, ...columnBounds, tableRight].forEach(drawVertical);
+}
+
+async function replaceMaintenancePlanPage18Values(pdf: PDFDocument, state: ReportRenderState) {
+  await replaceMaintenancePlanSummaryPageValues(
+    pdf,
+    17,
+    maintenancePlanPage18Items,
+    state.maintenancePlanPage18Values,
+    213.415,
+    277.015,
+    710.215
+  );
+}
+
+function drawMaintenancePlanPage19SignatureText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  centerTop: number,
+  maxWidth: number,
+  scale: number,
+  italic = false
+) {
+  let fontSize = 17;
+  do {
+    context.font = `${italic ? "italic " : ""}${fontSize * scale}px "MaintenancePage19SignatureCordiaNew"`;
+    if (context.measureText(text).width <= maxWidth * scale || fontSize <= 10) break;
+    fontSize -= 0.5;
+  } while (fontSize >= 10);
+  context.fillText(text, Math.round(centerX * scale), Math.round(centerTop * scale));
+}
+
+async function createMaintenancePlanPage19SignatureOverlayBytes(
+  typedSignature: string,
+  signerName: string
+) {
+  const scale = 6;
+  const canvas = document.createElement("canvas");
+  canvas.width = 540 * scale;
+  canvas.height = 780 * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare maintenance plan page 19 signature overlay");
+  const font = new FontFace("MaintenancePage19SignatureCordiaNew", 'local("Cordia New")');
+  await font.load();
+  document.fonts.add(font);
+  context.fillStyle = "#000000";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.textRendering = "geometricPrecision";
+
+  if (typedSignature) {
+    drawMaintenancePlanPage19SignatureText(context, typedSignature, 222.5, 649, 173, scale, true);
+  }
+  if (signerName) {
+    drawMaintenancePlanPage19SignatureText(context, signerName, 221.5, 669, 174, scale);
+  }
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode maintenance plan page 19 signature overlay"));
+    }, "image/png");
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function replaceMaintenancePlanPage19Signature(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[18];
+  if (!page) return;
+  const typedSignature = state.maintenancePlanPage19Signature.typedSignature.trim();
+  const signerName = state.maintenancePlanPage19Signature.signerName.trim();
+  const signatureEdit = state.imageEdits.maintenance_page19_signature;
+
+  if (typedSignature && !signatureEdit) {
+    page.drawRectangle({ x: 131, y: 121, width: 183, height: 22, color: rgb(1, 1, 1) });
+  }
+  if (signerName) {
+    page.drawRectangle({ x: 131, y: 102, width: 181, height: 20, color: rgb(1, 1, 1) });
+  }
+  if ((typedSignature && !signatureEdit) || signerName) {
+    const overlayBytes = await createMaintenancePlanPage19SignatureOverlayBytes(
+      signatureEdit ? "" : typedSignature,
+      signerName
+    );
+    const overlay = await pdf.embedPng(overlayBytes);
+    page.drawImage(overlay, { x: 0, y: 0, width: 540, height: 780 });
+  }
+
+  if (signatureEdit) {
+    const signatureBytes = await imageUrlToSignaturePngBytes(signatureEdit.objectUrl, 660, 112);
+    const signature = await pdf.embedPng(signatureBytes);
+    page.drawImage(signature, { x: 140, y: 121, width: 165, height: 28 });
+  }
+}
+
+async function replaceMaintenancePlanPage19Values(pdf: PDFDocument, state: ReportRenderState) {
+  await replaceMaintenancePlanSummaryPageValues(
+    pdf,
+    18,
+    maintenancePlanPage19Items,
+    state.maintenancePlanPage19Values,
+    59.383,
+    122.983,
+    601.783
+  );
+  await replaceMaintenancePlanPage19Signature(pdf, state);
+}
+
 export async function createReportPdf(state: ReportRenderState) {
   if (state.templateId === "maintenance-plan") {
     const templateBytes = await fetch("/templates/building-maintenance-plan.pdf").then((response) => {
       if (!response.ok) throw new Error("ไม่สามารถโหลด PDF แผนปฏิบัติการได้");
       return response.arrayBuffer();
     });
-    return new Uint8Array(templateBytes);
+    const pdf = await PDFDocument.load(templateBytes);
+    replaceMaintenancePlanPage7Checks(pdf, state);
+    replaceMaintenancePlanPage8Checks(pdf, state);
+    replaceMaintenancePlanPages9To16Checks(pdf, state);
+    await replaceMaintenancePlanPage18Values(pdf, state);
+    await replaceMaintenancePlanPage19Values(pdf, state);
+    return pdf.save();
   }
 
   const templateBytes = await fetch("/templates/bangchan-building-inspection.pdf").then((response) =>

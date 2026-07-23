@@ -25,8 +25,8 @@ export function login(email: string, password: string) {
     method: 'POST',
     body: JSON.stringify({ email, password })
   }).then((res) => {
-    if (res && (res as any).token) {
-      setAuthToken((res as any).token);
+    if (res && res.token) {
+      setAuthToken(res.token);
     }
     return res;
   });

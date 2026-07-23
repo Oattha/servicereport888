@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LoginPage } from "./pages/LoginPage";
 import { AppShell } from "./components/AppShell";
 import { ReportsPage } from "./pages/ReportsPage";
 import { MyReportsPage } from "./pages/MyReportsPage";
 import { AllReportsPage } from "./pages/AllReportsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { onUnauthorized, setAuthToken } from "./lib/http";
 import type { AppSection, ReportDraft } from "./types";
 
 const persistentAuthKey = "service-report-authenticated";
@@ -47,8 +48,15 @@ export function App() {
   function handleLogout() {
     localStorage.removeItem(persistentAuthKey);
     sessionStorage.removeItem(sessionAuthKey);
+    setAuthToken(null);
     setIsAuthenticated(false);
   }
+
+  useEffect(() => {
+    onUnauthorized(() => {
+      handleLogout();
+    });
+  }, []);
 
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} />;

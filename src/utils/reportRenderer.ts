@@ -43,6 +43,26 @@ const CHECKLIST_TABLE_PAGES = [
 ] as const;
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
+// --- วางต่อท้าย imageCache ---
+let cachedTemplateBytes: ArrayBuffer | null = null;
+let cachedFontBytes: ArrayBuffer | null = null;
+
+async function getTemplateArrayBuffer() {
+  if (!cachedTemplateBytes) {
+    const response = await fetch("/templates/bangchan-building-inspection.pdf");
+    cachedTemplateBytes = await response.arrayBuffer();
+  }
+  return cachedTemplateBytes.slice(0);
+}
+
+async function getTahomaFontBuffer() {
+  if (!cachedFontBytes) {
+    const response = await fetch("/fonts/tahoma.ttf");
+    cachedFontBytes = await response.arrayBuffer();
+  }
+  return cachedFontBytes.slice(0);
+}
+
 type PdfNameMap = {
   set: (name: PDFName, value: unknown) => void;
 };
@@ -607,7 +627,7 @@ async function replaceMapLocationText(pdf: PDFDocument, state: ReportRenderState
   if (!page) return;
 
   pdf.registerFontkit(fontkit);
-  const fontBytes = await fetch("/fonts/tahoma.ttf").then((response) => response.arrayBuffer());
+  const fontBytes = await getTahomaFontBuffer();
   const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
   const googleMapsUrl = state.mapLocation.googleMapsUrl.trim();
   const latitude = Number(state.mapLocation.latitude);
@@ -1303,11 +1323,36 @@ async function createSection2EvidenceTextOverlayBytes(
 
 async function replaceSection2EvidencePages(pdf: PDFDocument, state: ReportRenderState) {
   const placements = getSection2EvidencePlacements(state.page23Results, state.page24Results);
+  
   for (const pageNumber of [21, 22, 23] as const) {
     const page = pdf.getPages()[pageNumber - 1];
     const pagePlacements = placements.filter((placement) => placement.page === pageNumber);
+    
+    // เคลียร์หน้ากระดาษเดิมเป็นสีขาว
     page.drawRectangle({ x: 36, y: 40, width: 468, height: 698, color: rgb(1, 1, 1) });
 
+    // 💡 กรณีที่ไม่มีรายการแนบรูปเลยในหน้านี้ (เช่น ติ๊ก "ไม่มี" ทั้งหมด)
+    if (pagePlacements.length === 0) {
+      pdf.registerFontkit(fontkit);
+      const fontBytes = await getTahomaFontBuffer();
+      const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+      
+      const noticeText = "ไม่มีรายการที่ต้องแนบรูปภาพหลักฐาน";
+      const fontSize = 16;
+      const textWidth = thaiFont.widthOfTextAtSize(noticeText, fontSize);
+      
+      // วาดข้อความแจ้งเตือนไว้กลางหน้ากระดาษ
+      page.drawText(noticeText, {
+        x: (540 - textWidth) / 2, // จัดกึ่งกลางแนวนอน
+        y: 400,                   // จัดกึ่งกลางแนวตั้ง
+        size: fontSize,
+        font: thaiFont,
+        color: rgb(0.45, 0.52, 0.6) // สีเทาสุภาพ
+      });
+      continue;
+    }
+
+    // มีรายการแนบรูป ให้วาดช่องรูปและรูปภาพตามปกติ
     for (const placement of pagePlacements) {
       const imageY = 780 - placement.top - placement.imageHeight;
       page.drawRectangle({
@@ -1335,7 +1380,6 @@ async function replaceSection2EvidencePages(pdf: PDFDocument, state: ReportRende
       });
     }
 
-    if (pagePlacements.length === 0) continue;
     const textOverlayBytes = await createSection2EvidenceTextOverlayBytes(pagePlacements, state.imageEdits);
     const textOverlay = await pdf.embedPng(textOverlayBytes);
     page.drawImage(textOverlay, { x: 54, y: 60, width: 432, height: 675 });
@@ -2928,52 +2972,108 @@ async function replaceMaintenancePlanPage19Values(pdf: PDFDocument, state: Repor
   await replaceMaintenancePlanPage19Signature(pdf, state);
 }
 
-export async function createReportPdf(state: ReportRenderState) {
+export async function createReportPdf(state: ReportRenderState, targetPage?: number) {
   if (state.templateId === "maintenance-plan") {
     const templateBytes = await fetch("/templates/building-maintenance-plan.pdf").then((response) => {
       if (!response.ok) throw new Error("ไม่สามารถโหลด PDF แผนปฏิบัติการได้");
       return response.arrayBuffer();
     });
     const pdf = await PDFDocument.load(templateBytes);
-    replaceMaintenancePlanPage7Checks(pdf, state);
-    replaceMaintenancePlanPage8Checks(pdf, state);
-    replaceMaintenancePlanPages9To16Checks(pdf, state);
-    await replaceMaintenancePlanPage18Values(pdf, state);
-    await replaceMaintenancePlanPage19Values(pdf, state);
+    
+    // ถ้าพรีวิวเฉพาะหน้า ให้เลือกทำเฉพาะหน้าที่ตรงกัน
+    if (!targetPage || targetPage === 7) replaceMaintenancePlanPage7Checks(pdf, state);
+    if (!targetPage || targetPage === 8) replaceMaintenancePlanPage8Checks(pdf, state);
+    if (!targetPage || (targetPage >= 9 && targetPage <= 16)) replaceMaintenancePlanPages9To16Checks(pdf, state);
+    if (!targetPage || targetPage === 18) await replaceMaintenancePlanPage18Values(pdf, state);
+    if (!targetPage || targetPage === 19) await replaceMaintenancePlanPage19Values(pdf, state);
+
+    if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
+      const previewPdf = await PDFDocument.create();
+      const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
+      previewPdf.addPage(copiedPage);
+      return previewPdf.save();
+    }
+
     return pdf.save();
   }
 
-  const templateBytes = await fetch("/templates/bangchan-building-inspection.pdf").then((response) =>
-    response.arrayBuffer()
-  );
+  const templateBytes = await getTemplateArrayBuffer();
   const pdf = await PDFDocument.load(templateBytes);
   pdf.insertPage(22, [540, 780]);
 
-  replacePage14Checkboxes(pdf, state);
-  replacePage17BuildingTypeCheckboxes(pdf, state);
-  replacePage18Checkboxes(pdf, state);
-  patchExistingYearText(pdf, getFieldValue(state, "cover_year"));
-  removeCoverText(pdf);
+  // 🔥 ทำเฉพาะฟังก์ชันที่เกี่ยวข้องกับหน้าที่กำลัง Preview เท่านั้น
+if (!targetPage || targetPage === 1) {
+    patchExistingYearText(pdf, getFieldValue(state, "cover_year"));
+    removeCoverText(pdf);
+    await replaceDefaultCoverBuildingPhoto(pdf, state);
+    await replaceCoverText(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 12 || targetPage === 13) {
+    removeDefaultChecklistMarks(pdf);
+    await drawChecklistFrequencyHeaders(pdf);
+    await replaceChecklistMarks(pdf, state);
+    if (!targetPage || targetPage === 13) {
+      await replacePage13Item235Text(pdf);
+    }
+  }
+
+  if (!targetPage || targetPage === 14) {
+    replacePage14Checkboxes(pdf, state);
+    await replaceGeneralBuildingInfo(pdf, state);
+    await replacePage14PermitText(pdf, state);
+    await replacePage14ControlledUseDate(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 15) {
+    await replaceMapImageSlot(pdf, state);
+    await replaceMapLocationText(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 17) {
+    replacePage17BuildingTypeCheckboxes(pdf, state);
+    await replacePage17PartyDetails(pdf, state);
+    await replacePage17OtherText(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 18) {
+    replacePage18Checkboxes(pdf, state);
+    await replacePage18Text(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 21 || targetPage === 22 || targetPage === 23) {
+    await replaceSection2EvidencePages(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 24) {
+    await replacePage23Table(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 25) {
+    await replacePage24Table(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 26) {
+    await replacePage25Signatures(pdf, state);
+  }
+
+  if (!targetPage || targetPage === 12 || targetPage === 13) {
+    removeDefaultChecklistMarks(pdf);
+    await drawChecklistFrequencyHeaders(pdf);
+    await replaceChecklistMarks(pdf, state);
+  }
+
+  // ปรับโลโก้หัวกระดาษและรูปภาพทั่วไป
   await replaceDefaultHeaderLogos(pdf, state);
-  await replacePage13Item235Text(pdf);
-  await replaceDefaultCoverBuildingPhoto(pdf, state);
   await replacePdfImageXObjects(pdf, state);
-  await replaceMapImageSlot(pdf, state);
-  await replaceMapLocationText(pdf, state);
-  await replaceCoverText(pdf, state);
-  await replaceGeneralBuildingInfo(pdf, state);
-  await replacePage14PermitText(pdf, state);
-  await replacePage14ControlledUseDate(pdf, state);
-  await replacePage17PartyDetails(pdf, state);
-  await replacePage17OtherText(pdf, state);
-  await replacePage18Text(pdf, state);
-  await replaceSection2EvidencePages(pdf, state);
-  await replacePage23Table(pdf, state);
-  await replacePage24Table(pdf, state);
-  await replacePage25Signatures(pdf, state);
-  removeDefaultChecklistMarks(pdf);
-  await drawChecklistFrequencyHeaders(pdf);
-  await replaceChecklistMarks(pdf, state);
+
+  // ตัดส่งเฉพาะหน้าปัจจุบันกรณี Preview
+  if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
+    const previewPdf = await PDFDocument.create();
+    const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
+    previewPdf.addPage(copiedPage);
+    return previewPdf.save();
+  }
 
   return pdf.save();
 }

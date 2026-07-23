@@ -12,6 +12,7 @@ import {
   X
 } from "lucide-react";
 import { createUser, deleteUser, getUsers, type CreateUserInput } from "../lib/api";
+import { LoadingSpinner, SkeletonTable } from "../components/LoadingSpinner";
 import type { UserRecord, UserRole, UserStatus } from "../types";
 
 const emptyForm: CreateUserInput = {
@@ -65,6 +66,7 @@ export function UsersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [form, setForm] = useState<CreateUserInput>(emptyForm);
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadUsers() {
     setIsLoading(true);
@@ -101,9 +103,19 @@ export function UsersPage() {
   const inactiveCount = users.filter((user) => user.status === "inactive").length;
   const roleCount = new Set(users.map((user) => user.role)).size;
 
+  function handleToggleModal(open: boolean) {
+    setIsDialogOpen(open);
+    if (!open) {
+      setForm(emptyForm);
+      setError("");
+    }
+  }
+
   async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
     setError("");
+    setIsSubmitting(true);
 
     try {
       const createdUser = await createUser(form);
@@ -112,6 +124,8 @@ export function UsersPage() {
       setIsDialogOpen(false);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "เพิ่มผู้ใช้งานไม่สำเร็จ");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -127,15 +141,15 @@ export function UsersPage() {
   }
 
   return (
-    <section className="users-page">
-      <div className="users-header">
+    <section className="users-page" style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="users-header" style={{ flexShrink: 0 }}>
         <div>
           <h1>จัดการผู้ใช้งาน (Users)</h1>
           <p>เพิ่ม แก้ไข ลบ และจัดการสิทธิ์การใช้งานของระบบ</p>
         </div>
       </div>
 
-      <div className="user-stat-grid">
+      <div className="user-stat-grid" style={{ flexShrink: 0 }}>
         <article className="user-stat-card">
           <span className="stat-icon blue"><Users size={28} /></span>
           <div><small>ผู้ใช้งานทั้งหมด</small><strong>{users.length} <span>คน</span></strong></div>
@@ -154,8 +168,8 @@ export function UsersPage() {
         </article>
       </div>
 
-      <section className="users-panel">
-        <div className="users-toolbar">
+      <section className="users-panel" style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+        <div className="users-toolbar" style={{ flexShrink: 0 }}>
           <label className="users-search">
             <input
               value={query}
@@ -175,7 +189,7 @@ export function UsersPage() {
             <option value="inactive">ไม่ใช้งาน</option>
           </select>
           <div className="users-toolbar-actions">
-            <button className="primary-action" type="button" onClick={() => setIsDialogOpen(true)}>
+            <button className="primary-action" type="button" onClick={() => handleToggleModal(true)}>
               <Plus size={18} />เพิ่มผู้ใช้งานใหม่
             </button>
             <button className="icon-button" type="button" aria-label="Refresh" onClick={() => void loadUsers()}>
@@ -184,27 +198,28 @@ export function UsersPage() {
           </div>
         </div>
 
-        {error ? <div className="panel-error">{error}</div> : null}
+        {error ? <div className="panel-error" style={{ flexShrink: 0 }}>{error}</div> : null}
 
-        <div className="users-table-wrap">
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>ลำดับ</th>
-                <th>ชื่อ-นามสกุล</th>
-                <th>ชื่อผู้ใช้</th>
-                <th>อีเมล</th>
-                <th>บทบาท</th>
-                <th>สถานะ</th>
-                <th>เข้าสู่ระบบล่าสุด</th>
-                <th>จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={8}><div className="empty-state">กำลังโหลดข้อมูล...</div></td></tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr><td colSpan={8}><div className="empty-state">ยังไม่มีข้อมูลผู้ใช้งาน</div></td></tr>
+        <div className="users-table-wrap" style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+          {isLoading ? (
+            <LoadingSpinner />
+          ) : (
+            <table className="users-table">
+              <thead>
+                <tr>
+                  <th>ลำดับ</th>
+                  <th>ชื่อ-นามสกุล</th>
+                  <th>ชื่อผู้ใช้</th>
+                  <th>อีเมล</th>
+                  <th>บทบาท</th>
+                  <th>สถานะ</th>
+                  <th>เข้าสู่ระบบล่าสุด</th>
+                  <th>จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr><td colSpan={8}><div className="empty-state">ยังไม่มีข้อมูลผู้ใช้งาน</div></td></tr>
               ) : (
                 filteredUsers.map((user, index) => (
                   <tr key={user.id}>
@@ -229,11 +244,12 @@ export function UsersPage() {
                   </tr>
                 ))
               )}
-            </tbody>
-          </table>
+             </tbody>
+           </table>
+         )}
         </div>
 
-        <div className="users-pagination">
+        <div className="users-pagination" style={{ flexShrink: 0 }}>
           <span>แสดง {filteredUsers.length} จาก {users.length} รายการ</span>
         </div>
       </section>
@@ -246,10 +262,12 @@ export function UsersPage() {
                 <h2>เพิ่มผู้ใช้งานใหม่</h2>
                 <p>ข้อมูลนี้จะถูกบันทึกลง PostgreSQL</p>
               </div>
-              <button type="button" className="icon-button" aria-label="Close" onClick={() => setIsDialogOpen(false)}>
+              <button type="button" className="icon-button" aria-label="Close" onClick={() => handleToggleModal(false)}>
                 <X size={18} />
               </button>
             </div>
+
+            {error ? <div className="panel-error" style={{ marginBottom: "1rem" }}>{error}</div> : null}
 
             <div className="modal-grid">
               <label className="field">
@@ -285,8 +303,10 @@ export function UsersPage() {
             </div>
 
             <div className="modal-actions">
-              <button className="secondary-action" type="button" onClick={() => setIsDialogOpen(false)}>ยกเลิก</button>
-              <button className="primary-action" type="submit">บันทึกผู้ใช้งาน</button>
+              <button className="secondary-action" type="button" onClick={() => handleToggleModal(false)}>ยกเลิก</button>
+              <button className="primary-action" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "กำลังบันทึก..." : "บันทึกผู้ใช้งาน"}
+              </button>
             </div>
           </form>
         </div>

@@ -21,9 +21,17 @@ type AppShellProps = {
   children: ReactNode;
 };
 
-const navItems = [
+const navItems: { id: AppSection; label: string; icon: typeof CalendarPlus }[] = [
   { id: "reports", label: "สร้างรายงานใหม่", icon: CalendarPlus }
-] as const;
+];
+
+// แมปชื่อหัวข้อบน Topbar ให้เปลี่ยนตามหน้าปัจจุบันโดยอัตโนมัติ
+const sectionTitles: Record<AppSection, string> = {
+  reports: "สร้างรายงานตรวจสอบอาคาร (ประจำปี)",
+  "my-reports": "รายงานของฉัน",
+  "all-reports": "รายงานทั้งหมด",
+  users: "จัดการผู้ใช้งานระบบ"
+};
 
 export function AppShell({ activeSection, onNavigate, onLogout, children }: AppShellProps) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -131,7 +139,7 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <h1 className="topbar-title">สร้างรายงานตรวจสอบอาคาร (ประจำปี)</h1>
+          <h1 className="topbar-title">{sectionTitles[activeSection]}</h1>
           <div className="search-box compact-search">
             <Search size={18} aria-hidden="true" />
             <input aria-label="Search" placeholder="Search reports, customers, templates" />

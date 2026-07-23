@@ -4,12 +4,24 @@ import bcrypt from "bcryptjs";
 import nodemailer from "nodemailer";
 import { randomUUID } from "node:crypto";
 import { pool } from "./db";
+import { signToken, authMiddleware, adminOnly, type AuthRequest } from "./auth";
 
 const app = express();
 const port = Number(process.env.API_PORT ?? 3001);
+const host = process.env.API_HOST ?? "127.0.0.1";
+const webOrigin = process.env.WEB_ORIGIN ?? "http://127.0.0.1:5173";
 
-app.use(cors({ origin: process.env.WEB_ORIGIN ?? "http://127.0.0.1:5173" }));
+app.use(cors({ origin: webOrigin }));
 app.use(express.json({ limit: "30mb" }));
+
+// Security headers middleware
+app.use((req, res, next) => {
+  res.set("X-Content-Type-Options", "nosniff");
+  res.set("X-Frame-Options", "DENY");
+  res.set("X-XSS-Protection", "1; mode=block");
+  res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  next();
+});
 
 app.get("/api/health", (_request, response) => {
   response.json({ ok: true });
@@ -66,54 +78,83 @@ app.post("/api/maps/resolve", async (request, response) => {
   }
 });
 
+function validateEmail(email: string): boolean {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function validatePassword(password: string): boolean {
+  return Boolean(password && password.length >= 6);
+}
+
 app.post("/api/auth/login", async (request, response) => {
-  const { email, password } = request.body as { email?: string; password?: string };
+  try {
+    const { email, password } = request.body as { email?: string; password?: string };
 
-  if (!email || !password) {
-    return response.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน" });
+    if (!email?.trim() || !password) {
+      return response.status(400).json({ message: "กรุณากรอกอีเมลและรหัสผ่าน" });
+    }
+
+    if (!validateEmail(email)) {
+      return response.status(400).json({ message: "รูปแบบอีเมลไม่ถูกต้อง" });
+    }
+
+    const result = await pool.query(
+      `
+        SELECT id, full_name, username, email, password_hash, role, status
+        FROM users
+        WHERE lower(email) = lower($1)
+        LIMIT 1
+      `,
+      [email]
+    );
+
+    const user = result.rows[0];
+
+    if (!user || user.status !== "active" || !(await bcrypt.compare(password, user.password_hash))) {
+      return response.status(401).json({ message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" });
+    }
+
+    await pool.query("UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1", [user.id]);
+
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    return response.json({
+      id: user.id,
+      name: user.full_name,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      token
+    });
+  } catch (error) {
+    console.error("[Login error]", error);
+    return response.status(500).json({ message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
   }
-
-  const result = await pool.query(
-    `
-      SELECT id, full_name, username, email, password_hash, role, status
-      FROM users
-      WHERE lower(email) = lower($1)
-      LIMIT 1
-    `,
-    [email]
-  );
-
-  const user = result.rows[0];
-
-  if (!user || user.status !== "active" || !(await bcrypt.compare(password, user.password_hash))) {
-    return response.status(401).json({ message: "อีเมลหรือรหัสผ่านไม่ถูกต้อง" });
-  }
-
-  await pool.query("UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1", [user.id]);
-
-  response.json({
-    id: user.id,
-    name: user.full_name,
-    username: user.username,
-    email: user.email,
-    role: user.role,
-    status: user.status
-  });
 });
 
-app.get("/api/users", async (_request, response) => {
-  const result = await pool.query(
-    `
-      SELECT id, full_name AS "fullName", username, email, role, status, last_login_at AS "lastLoginAt"
-      FROM users
-      ORDER BY created_at DESC
-    `
-  );
-
-  response.json(result.rows);
+app.get("/api/users", authMiddleware, async (_request, response) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT id, full_name AS "fullName", username, email, role, status, last_login_at AS "lastLoginAt"
+        FROM users
+        ORDER BY created_at DESC
+      `
+    );
+    return response.json(result.rows);
+  } catch (error) {
+    console.error("[Get users error]", error);
+    return response.status(500).json({ message: "ไม่สามารถดึงข้อมูลผู้ใช้ได้" });
+  }
 });
 
-app.post("/api/users", async (request, response) => {
+app.post("/api/users", authMiddleware, adminOnly, async (request, response) => {
   const { fullName, username, email, password, role, status } = request.body as {
     fullName?: string;
     username?: string;
@@ -123,24 +164,31 @@ app.post("/api/users", async (request, response) => {
     status?: string;
   };
 
-  if (!fullName || !username || !email || !password || !role || !status) {
+  if (!fullName?.trim() || !username?.trim() || !email?.trim() || !password || !role || !status) {
     return response.status(400).json({ message: "กรุณากรอกข้อมูลผู้ใช้ให้ครบ" });
+  }
+
+  if (!validateEmail(email)) {
+    return response.status(400).json({ message: "รูปแบบอีเมลไม่ถูกต้อง" });
+  }
+
+  if (!validatePassword(password)) {
+    return response.status(400).json({ message: "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร" });
   }
 
   if (!["admin", "user"].includes(role) || !["active", "inactive"].includes(status)) {
     return response.status(400).json({ message: "บทบาทหรือสถานะไม่ถูกต้อง" });
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
-
   try {
+    const passwordHash = await bcrypt.hash(password, 10);
     const result = await pool.query(
       `
         INSERT INTO users (full_name, username, email, password_hash, role, status)
         VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, full_name AS "fullName", username, email, role, status, last_login_at AS "lastLoginAt"
       `,
-      [fullName, username, email, passwordHash, role, status]
+      [fullName.trim(), username.trim(), email.trim(), passwordHash, role, status]
     );
 
     return response.status(201).json(result.rows[0]);
@@ -148,44 +196,53 @@ app.post("/api/users", async (request, response) => {
     if (typeof error === "object" && error && "code" in error && error.code === "23505") {
       return response.status(409).json({ message: "ชื่อผู้ใช้หรืออีเมลนี้มีอยู่แล้ว" });
     }
-
-    throw error;
+    console.error("[Create user error]", error);
+    return response.status(500).json({ message: "ไม่สามารถสร้างผู้ใช้งานได้" });
   }
 });
 
-app.delete("/api/users/:id", async (request, response) => {
-  await pool.query("DELETE FROM users WHERE id = $1", [request.params.id]);
-  response.json({ ok: true });
+app.delete("/api/users/:id", authMiddleware, adminOnly, async (request, response) => {
+  try {
+    await pool.query("DELETE FROM users WHERE id = $1", [request.params.id]);
+    return response.json({ ok: true });
+  } catch (error) {
+    console.error("[Delete user error]", error);
+    return response.status(500).json({ message: "ไม่สามารถลบผู้ใช้งานได้" });
+  }
 });
 
-app.get("/api/reports", async (_request, response) => {
-  const result = await pool.query(
-    `
-      SELECT
-        reports.id,
-        reports.report_no AS "reportNo",
-        COALESCE(customers.name, '-') AS customer,
-        COALESCE(buildings.name, '-') AS building,
-        COALESCE(report_templates.name, '-') AS template,
-        COALESCE(users.full_name, 'User') AS inspector,
-        reports.status,
-        reports.progress,
-        reports.recipient_email AS "recipientEmail",  
-        reports.email_sent_at AS "emailSentAt",      
-        reports.updated_at AS "updatedAt"
-      FROM reports
-      LEFT JOIN customers ON customers.id = reports.customer_id
-      LEFT JOIN buildings ON buildings.id = reports.building_id
-      LEFT JOIN report_templates ON report_templates.id = reports.template_id
-      LEFT JOIN users ON users.id = reports.inspector_id
-      ORDER BY reports.updated_at DESC
-    `
-  );
-
-  response.json(result.rows);
+app.get("/api/reports", authMiddleware, async (_request, response) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          reports.id,
+          reports.report_no AS "reportNo",
+          COALESCE(customers.name, '-') AS customer,
+          COALESCE(buildings.name, '-') AS building,
+          COALESCE(report_templates.name, '-') AS template,
+          COALESCE(users.full_name, 'User') AS inspector,
+          reports.status,
+          reports.progress,
+          reports.recipient_email AS "recipientEmail",  
+          reports.email_sent_at AS "emailSentAt",      
+          reports.updated_at AS "updatedAt"
+        FROM reports
+        LEFT JOIN customers ON customers.id = reports.customer_id
+        LEFT JOIN buildings ON buildings.id = reports.building_id
+        LEFT JOIN report_templates ON report_templates.id = reports.template_id
+        LEFT JOIN users ON users.id = reports.inspector_id
+        ORDER BY reports.updated_at DESC
+      `
+    );
+    return response.json(result.rows);
+  } catch (error) {
+    console.error("[Get reports error]", error);
+    return response.status(500).json({ message: "ไม่สามารถดึงข้อมูลรายงานได้" });
+  }
 });
 
-app.post("/api/reports", async (request, response) => {
+app.post("/api/reports", authMiddleware, async (request, response) => {
   const {
     ownerCompany,
     customerEmail,
@@ -280,121 +337,126 @@ app.post("/api/reports", async (request, response) => {
     return response.status(201).json(savedReport.rows[0]);
   } catch (error) {
     await client.query("ROLLBACK");
-    throw error;
+    console.error("[Create report error]", error);
+    return response.status(500).json({ message: "ไม่สามารถบันทึกรายงานได้" });
   } finally {
     client.release();
   }
 });
 
-app.post("/api/reports/:id/email", async (request, response) => {
-  const { recipientEmail, ccEmail, fileName, pdfBase64 } = request.body as {
-    recipientEmail?: string;
-    ccEmail?: string; // <-- รับค่า ccEmail เพิ่ม
-    fileName?: string;
-    pdfBase64?: string;
-  };
-
-  const normalizedEmail = recipientEmail?.trim().toLowerCase() ?? "";
-  const normalizedCc = ccEmail?.trim().toLowerCase() ?? "";
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-    return response.status(400).json({ message: "กรุณากรอกอีเมลผู้รับให้ถูกต้อง" });
-  }
-  
-  if (normalizedCc && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedCc)) {
-    return response.status(400).json({ message: "กรุณากรอกอีเมล CC ให้ถูกต้อง" });
-  }
-
-  if (!fileName?.trim() || !pdfBase64) {
-    return response.status(400).json({ message: "ไม่พบไฟล์ PDF สำหรับส่งอีเมล" });
-  }
-
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = Number(process.env.SMTP_PORT ?? 587);
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
-
-  if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
-    return response.status(503).json({
-      message: "ยังไม่ได้ตั้งค่าระบบส่งอีเมล กรุณากำหนด SMTP_HOST, SMTP_USER, SMTP_PASS และ SMTP_FROM"
-    });
-  }
-
-  const reportResult = await pool.query(
-    `
-      SELECT reports.id, reports.report_no, customers.name AS customer, buildings.name AS building
-      FROM reports
-      LEFT JOIN customers ON customers.id = reports.customer_id
-      LEFT JOIN buildings ON buildings.id = reports.building_id
-      WHERE reports.id = $1
-      LIMIT 1
-    `,
-    [request.params.id]
-  );
-  const report = reportResult.rows[0];
-  if (!report) {
-    return response.status(404).json({ message: "ไม่พบรายงานที่ต้องการส่ง" });
-  }
-
-  const attachment = Buffer.from(pdfBase64, "base64");
-  if (attachment.length === 0 || attachment.length > 25 * 1024 * 1024) {
-    return response.status(400).json({ message: "ไฟล์ PDF ไม่ถูกต้องหรือมีขนาดเกิน 25 MB" });
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: false, // ใช้ false สำหรับ port 587
-    auth: { user: smtpUser, pass: smtpPass },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
-
+app.post("/api/reports/:id/email", authMiddleware, async (request, response) => {
   try {
+    const { recipientEmail, ccEmail, fileName, pdfBase64 } = request.body as {
+      recipientEmail?: string;
+      ccEmail?: string;
+      fileName?: string;
+      pdfBase64?: string;
+    };
+
+    const normalizedEmail = recipientEmail?.trim().toLowerCase() ?? "";
+    const normalizedCc = ccEmail?.trim().toLowerCase() ?? "";
+
+    if (!validateEmail(normalizedEmail)) {
+      return response.status(400).json({ message: "กรุณากรอกอีเมลผู้รับให้ถูกต้อง" });
+    }
+    
+    if (normalizedCc && !validateEmail(normalizedCc)) {
+      return response.status(400).json({ message: "กรุณากรอกอีเมล CC ให้ถูกต้อง" });
+    }
+
+    if (!fileName?.trim() || !pdfBase64) {
+      return response.status(400).json({ message: "ไม่พบไฟล์ PDF สำหรับส่งอีเมล" });
+    }
+
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = Number(process.env.SMTP_PORT ?? 587);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
+
+    if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+      return response.status(503).json({
+        message: "ยังไม่ได้ตั้งค่าระบบส่งอีเมล กรุณากำหนด SMTP_HOST, SMTP_USER, SMTP_PASS และ SMTP_FROM"
+      });
+    }
+
+    const reportResult = await pool.query(
+      `
+        SELECT reports.id, reports.report_no, customers.name AS customer, buildings.name AS building
+        FROM reports
+        LEFT JOIN customers ON customers.id = reports.customer_id
+        LEFT JOIN buildings ON buildings.id = reports.building_id
+        WHERE reports.id = $1
+        LIMIT 1
+      `,
+      [request.params.id]
+    );
+    const report = reportResult.rows[0];
+    if (!report) {
+      return response.status(404).json({ message: "ไม่พบรายงานที่ต้องการส่ง" });
+    }
+
+    const attachment = Buffer.from(pdfBase64, "base64");
+    if (attachment.length === 0 || attachment.length > 25 * 1024 * 1024) {
+      return response.status(400).json({ message: "ไฟล์ PDF ไม่ถูกต้องหรือมีขนาดเกิน 25 MB" });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: false,
+      auth: { user: smtpUser, pass: smtpPass },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
     await transporter.sendMail({
       from: smtpFrom,
       to: normalizedEmail,
-      cc: normalizedCc || undefined, // <-- ส่ง CC ถ้ามีการระบุ
+      cc: normalizedCc || undefined,
       subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
       text: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
       attachments: [{ filename: fileName.trim(), content: attachment, contentType: "application/pdf" }]
     });
+
+    const sentAt = new Date();
+    await pool.query(
+      `UPDATE reports SET status = 'sent', recipient_email = $2, email_sent_at = $3, updated_at = NOW() WHERE id = $1`,
+      [request.params.id, normalizedEmail, sentAt]
+    );
+
+    return response.json({ ok: true, recipientEmail: normalizedEmail, ccEmail: normalizedCc, sentAt: sentAt.toISOString() });
   } catch (error) {
     console.error("[Send report email failed]", error);
     return response.status(502).json({ message: "ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า SMTP แล้วลองอีกครั้ง" });
   }
-
-  const sentAt = new Date();
-  await pool.query(
-    `UPDATE reports SET status = 'sent', recipient_email = $2, email_sent_at = $3, updated_at = NOW() WHERE id = $1`,
-    [request.params.id, normalizedEmail, sentAt]
-  );
-
-  return response.json({ ok: true, recipientEmail: normalizedEmail, ccEmail: normalizedCc, sentAt: sentAt.toISOString() });
 });
 
-app.get("/api/templates", async (_request, response) => {
-  const result = await pool.query(
-    `
-      SELECT
-        id,
-        code,
-        name,
-        version,
-        page_count AS "pageCount",
-        locked_fields_count AS "lockedFieldsCount",
-        is_active AS "isActive",
-        updated_at AS "updatedAt"
-      FROM report_templates
-      ORDER BY updated_at DESC
-    `
-  );
-
-  response.json(result.rows);
+app.get("/api/templates", authMiddleware, async (_request, response) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          code,
+          name,
+          version,
+          page_count AS "pageCount",
+          locked_fields_count AS "lockedFieldsCount",
+          is_active AS "isActive",
+          updated_at AS "updatedAt"
+        FROM report_templates
+        ORDER BY updated_at DESC
+      `
+    );
+    return response.json(result.rows);
+  } catch (error) {
+    console.error("[Get templates error]", error);
+    return response.status(500).json({ message: "ไม่สามารถดึงข้อมูลเทมเพลตได้" });
+  }
 });
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`API server running at http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`API server running at http://${host}:${port}`);
 });

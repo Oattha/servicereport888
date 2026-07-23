@@ -6,12 +6,27 @@ import {
   Mail,
   RefreshCw,
   Send,
-  X
+  X,
+  Eye
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
+import { LoadingSpinner } from "../components/LoadingSpinner";
 import { getReports, sendReportEmail } from "../lib/api";
-import type { SharedReport } from "../types";
+import { createReportPdf } from "../utils/reportRenderer";
+import { defaultTemplateFieldValues } from "../data/pdfTemplate";
+import { defaultInspectionChecks } from "../data/inspectionChecklist";
+import { defaultMaintenancePlanPage7Checks } from "../data/maintenancePlanPage7";
+import { defaultMaintenancePlanPage8Checks } from "../data/maintenancePlanPage8";
+import { defaultMaintenancePlanPages9To16Checks } from "../data/maintenancePlanPages9To16";
+import { defaultMaintenancePlanPage18Values } from "../data/maintenancePlanPage18";
+import { defaultMaintenancePlanPage19Values, defaultMaintenancePlanPage19Signature } from "../data/maintenancePlanPage19";
+import { defaultPage14Checkboxes } from "../data/page14Checkboxes";
+import { defaultPage18Checks, defaultPage18Materials, defaultPage18Text } from "../data/page18Fields";
+import { defaultPage23Remarks, defaultPage23Results } from "../data/page23Fields";
+import { defaultPage24Remarks, defaultPage24Results } from "../data/page24Fields";
+import { defaultPage25Signatures } from "../data/page25Fields";
+import type { SharedReport, ReportRenderState } from "../types";
 
 function formatUpdatedAt(value?: string | null) {
   if (!value) return "-";
@@ -21,19 +36,35 @@ function formatUpdatedAt(value?: string | null) {
   }).format(new Date(value));
 }
 
+function pdfBytesToBase64(pdfBytes: Uint8Array) {
+  const blobPart = new ArrayBuffer(pdfBytes.byteLength);
+  new Uint8Array(blobPart).set(pdfBytes);
+  const blob = new Blob([blobPart], { type: "application/pdf" });
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+    reader.onerror = () => reject(reader.error ?? new Error("ไม่สามารถอ่านไฟล์ PDF ได้"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function AllReportsPage() {
   const [reports, setReports] = useState<SharedReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedReport, setSelectedReport] = useState<SharedReport | null>(null);
 
-  // State สำหรับฟอร์มส่งอีเมลใน Modal
   const [resendEmail, setResendEmail] = useState("");
   const [resendCc, setResendCc] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState("");
   const [sendSuccess, setSendSuccess] = useState(false);
   const [showForm, setShowForm] = useState(false);
+
+  // 💡 State สำหรับควบคุมการแสดงตัวอย่าง PDF
+  const [isPreviewingPdf, setIsPreviewingPdf] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
 
   async function loadReports() {
     setIsLoading(true);
@@ -60,6 +91,11 @@ export function AllReportsPage() {
     setSendError("");
     setSendSuccess(false);
     setShowForm(!report.recipientEmail);
+    setIsPreviewingPdf(false);
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl);
+      setPdfPreviewUrl(null);
+    }
   }
 
   function handleCloseModal() {
@@ -67,6 +103,83 @@ export function AllReportsPage() {
     setShowForm(false);
     setSendSuccess(false);
     setSendError("");
+    setIsPreviewingPdf(false);
+    if (pdfPreviewUrl) {
+      URL.revokeObjectURL(pdfPreviewUrl);
+      setPdfPreviewUrl(null);
+    }
+  }
+
+  // 💡 ฟังก์ชันสร้างและเปิดดูตัวอย่างไฟล์ PDF ทางหน้าจอ
+  // 💡 แก้ไขฟังก์ชันนี้ให้เปิดไฟล์ PDF ในแท็บใหม่ทันที (รองรับมือถือและเดสก์ท็อปสมบูรณ์แบบ)
+  async function handlePreviewPdf() {
+    if (!selectedReport) return;
+    setIsGeneratingPreview(true);
+    try {
+      const renderState: ReportRenderState = {
+        templateId: "annual-inspection",
+        maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
+        maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
+        maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
+        maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
+        maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
+        maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
+        fieldValues: {
+          ...defaultTemplateFieldValues,
+          owner_company: selectedReport.customer,
+          building_name: selectedReport.building,
+          customer_email: resendEmail || "customer@example.com"
+        },
+        inspectionChecks: defaultInspectionChecks,
+        page14Checks: defaultPage14Checkboxes,
+        page17Owner: {},
+        page17Occupant: {},
+        page17BuildingTypes: {
+          high_rise: false,
+          extra_large: false,
+          assembly: false,
+          theater: false,
+          hotel_80_rooms: false,
+          entertainment_venue_200_sqm: false,
+          residential_2000_sqm: false,
+          factory_5000_sqm: false,
+          other: false
+        },
+        page17OtherText: "",
+        page18Checks: defaultPage18Checks,
+        page18Text: defaultPage18Text,
+        page18Materials: defaultPage18Materials,
+        page23Results: defaultPage23Results,
+        page23Remarks: defaultPage23Remarks,
+        page24Results: defaultPage24Results,
+        page24Remarks: defaultPage24Remarks,
+        page25Signatures: defaultPage25Signatures,
+        imageEdits: {},
+        mapLocation: {
+          latitude: "",
+          longitude: "",
+          googleMapsUrl: "",
+          mapScreenshotUrl: "",
+          uploadedImageUrl: "",
+          uploadedImageName: "",
+          mapImageSource: "",
+          satellite: false,
+          placeName: "",
+          address: ""
+        }
+      };
+
+      const pdfBytes = await createReportPdf(renderState);
+      const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      
+      // 💡 สั่งเปิดแท็บใหม่ทันที
+      window.open(url, "_blank");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ไม่สามารถสร้างตัวอย่าง PDF ได้");
+    } finally {
+      setIsGeneratingPreview(false);
+    }
   }
 
   async function handleSendEmail() {
@@ -90,13 +203,68 @@ export function AllReportsPage() {
 
     try {
       const pdfFileName = `รายงานตรวจสอบอาคาร-${selectedReport.building}.pdf`;
-      const dummyPdfBase64 = "JVBERi0xLjQKJSCi4P...==";
+      
+      const renderState: ReportRenderState = {
+        templateId: "annual-inspection",
+        maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
+        maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
+        maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
+        maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
+        maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
+        maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
+        fieldValues: {
+          ...defaultTemplateFieldValues,
+          owner_company: selectedReport.customer,
+          building_name: selectedReport.building,
+          customer_email: normalizedEmail
+        },
+        inspectionChecks: defaultInspectionChecks,
+        page14Checks: defaultPage14Checkboxes,
+        page17Owner: {},
+        page17Occupant: {},
+        page17BuildingTypes: {
+          high_rise: false,
+          extra_large: false,
+          assembly: false,
+          theater: false,
+          hotel_80_rooms: false,
+          entertainment_venue_200_sqm: false,
+          residential_2000_sqm: false,
+          factory_5000_sqm: false,
+          other: false
+        },
+        page17OtherText: "",
+        page18Checks: defaultPage18Checks,
+        page18Text: defaultPage18Text,
+        page18Materials: defaultPage18Materials,
+        page23Results: defaultPage23Results,
+        page23Remarks: defaultPage23Remarks,
+        page24Results: defaultPage24Results,
+        page24Remarks: defaultPage24Remarks,
+        page25Signatures: defaultPage25Signatures,
+        imageEdits: {},
+        mapLocation: {
+          latitude: "",
+          longitude: "",
+          googleMapsUrl: "",
+          mapScreenshotUrl: "",
+          uploadedImageUrl: "",
+          uploadedImageName: "",
+          mapImageSource: "",
+          satellite: false,
+          placeName: "",
+          address: ""
+        }
+      };
+
+      const pdfBytes = await createReportPdf(renderState);
+      const pdfBase64 = await pdfBytesToBase64(pdfBytes);
 
       await sendReportEmail(selectedReport.id, {
         recipientEmail: normalizedEmail,
         ccEmail: normalizedCc || undefined,
         fileName: pdfFileName,
-        pdfBase64: dummyPdfBase64
+        pdfBase64
       });
 
       setSendSuccess(true);
@@ -111,7 +279,6 @@ export function AllReportsPage() {
 
   return (
     <section className="page-stack">
-      {/* แทรก Style เฉพาะของ Hover แถวตาราง */}
       <style>{`
         .report-row-hover {
           cursor: pointer;
@@ -156,9 +323,7 @@ export function AllReportsPage() {
           </div>
         </div>
         {error ? <div className="empty-state">{error}</div> : null}
-        {!error && isLoading ? (
-          <div className="empty-state">กำลังโหลดรายงาน...</div>
-        ) : null}
+        {!error && isLoading ? <LoadingSpinner /> : null}
         {!error && !isLoading && reports.length === 0 ? (
           <div className="empty-state empty-panel">
             ยังไม่มีรายงานที่บันทึกเป็นฉบับเสร็จ
@@ -200,7 +365,6 @@ export function AllReportsPage() {
                     <td>
                       {report.status === "sent" ? (
                         <span
-                          className="completed-report-status"
                           style={{
                             backgroundColor: "#d1fae5",
                             color: "#065f46",
@@ -263,18 +427,20 @@ export function AllReportsPage() {
         ) : null}
       </section>
 
-      {/* Pop-up / Modal แสดงประวัติ + ปุ่มส่งอีเมล */}
+      {/* Pop-up / Modal แสดงประวัติ + ปุ่มดูตัวอย่าง PDF + ปุ่มส่งอีเมล */}
       {selectedReport ? (
         <div className="modal-backdrop" role="presentation">
           <div
             className="user-modal"
-            style={{ maxWidth: "520px", width: "100%" }}
+            style={{ maxWidth: isPreviewingPdf ? "900px" : "520px", width: "100%", transition: "max-width 0.3s ease" }}
             role="dialog"
             aria-labelledby="report-history-title"
           >
             <div className="modal-header">
               <div>
-                <h2 id="report-history-title">รายละเอียดและส่งอีเมล</h2>
+                <h2 id="report-history-title">
+                  {isPreviewingPdf ? "ตัวอย่างไฟล์ PDF รายงาน" : "รายละเอียดและส่งอีเมล"}
+                </h2>
                 <p>{selectedReport.reportNo}</p>
               </div>
               <button
@@ -287,187 +453,255 @@ export function AllReportsPage() {
               </button>
             </div>
 
-            <div style={{ display: "grid", gap: "1rem", marginTop: "1rem" }}>
-              {/* ข้อมูลอาคาร */}
-              <div
-                style={{
-                  backgroundColor: "#f9fafb",
-                  padding: "0.875rem",
-                  borderRadius: "0.5rem",
-                  border: "1px solid #e5e7eb"
-                }}
-              >
-                <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>ข้อมูลอาคาร/ลูกค้า</div>
-                <strong style={{ fontSize: "1.05rem", color: "#111827", display: "block" }}>
-                  {selectedReport.building}
-                </strong>
-                <span style={{ fontSize: "0.9rem", color: "#374151" }}>
-                  {selectedReport.customer}
-                </span>
-              </div>
+            {/* 💡 ส่วนแสดงผลตัวอย่าง PDF แบบฝังหน้าจอ (Iframe) */}
+            {isPreviewingPdf ? (
+              <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
+                {/* 💡 เปลี่ยนจาก iframe มาใช้ object + embed เพื่อให้มือถือเลื่อนนิ้วสไลด์ได้ปกติ */}
+                <div style={{ 
+                  width: "100%", 
+                  height: "480px", 
+                  border: "1px solid #d1d5db", 
+                  borderRadius: "0.5rem", 
+                  overflowY: "auto",
+                  WebkitOverflowScrolling: "touch",
+                  backgroundColor: "#ffffff" 
+                }}>
+                  {pdfPreviewUrl ? (
+                    <object
+                      data={`${pdfPreviewUrl}#view=FitH`}
+                      type="application/pdf"
+                      style={{ width: "100%", height: "100%", display: "block" }}
+                    >
+                      <embed 
+                        src={`${pdfPreviewUrl}#view=FitH`} 
+                        type="application/pdf" 
+                        style={{ width: "100%", height: "100%" }} 
+                      />
+                    </object>
+                  ) : null}
+                </div>
 
-              {/* แจ้งเตือนเมื่อส่งสำเร็จ */}
-              {sendSuccess ? (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  {pdfPreviewUrl ? (
+                    <a
+                      href={pdfPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="primary-action small-action"
+                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+                    >
+                      <FileText size={16} />
+                      เปิดอ่านไฟล์ PDF แบบเต็มจอ
+                    </a>
+                  ) : <span />}
+
+                  <button
+                    className="secondary-action"
+                    type="button"
+                    onClick={() => setIsPreviewingPdf(false)}
+                  >
+                    กลับสู่เมนูรายละเอียด
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: "1rem", marginTop: "1rem" }}>
                 <div
                   style={{
-                    backgroundColor: "#d1fae5",
-                    color: "#065f46",
+                    backgroundColor: "#f9fafb",
                     padding: "0.875rem",
                     borderRadius: "0.5rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    fontSize: "0.9rem"
-                  }}
-                >
-                  <CheckCircle2 size={18} />
-                  <span>ส่งอีเมลรายงานเรียบร้อยแล้ว!</span>
-                </div>
-              ) : null}
-
-              {/* กล่องประวัติการส่งเดิม */}
-              {selectedReport.recipientEmail && !showForm ? (
-                <div
-                  style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
                     border: "1px solid #e5e7eb",
-                    backgroundColor: "#f0fdf4"
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
                   }}
                 >
+                  <div>
+                    <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>ข้อมูลอาคาร/ลูกค้า</div>
+                    <strong style={{ fontSize: "1.05rem", color: "#111827", display: "block" }}>
+                      {selectedReport.building}
+                    </strong>
+                    <span style={{ fontSize: "0.9rem", color: "#374151" }}>
+                      {selectedReport.customer}
+                    </span>
+                  </div>
+
+                  {/* 💡 ปุ่มกดเปิดดูตัวอย่าง PDF */}
+                  <button
+                    className="secondary-action small-action"
+                    type="button"
+                    disabled={isGeneratingPreview}
+                    onClick={() => void handlePreviewPdf()}
+                    style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", borderColor: "#3b82f6", color: "#2563eb" }}
+                  >
+                    <Eye size={16} />
+                    {isGeneratingPreview ? "กำลังโหลด..." : "ดูตัวอย่าง PDF"}
+                  </button>
+                </div>
+
+                {sendSuccess ? (
                   <div
                     style={{
+                      backgroundColor: "#d1fae5",
+                      color: "#065f46",
+                      padding: "0.875rem",
+                      borderRadius: "0.5rem",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "0.5rem"
+                      gap: "0.5rem",
+                      fontSize: "0.9rem"
+                    }}
+                  >
+                    <CheckCircle2 size={18} />
+                    <span>ส่งอีเมลรายงานเรียบร้อยแล้ว!</span>
+                  </div>
+                ) : null}
+
+                {selectedReport.recipientEmail && !showForm ? (
+                  <div
+                    style={{
+                      padding: "1rem",
+                      borderRadius: "0.5rem",
+                      border: "1px solid #e5e7eb",
+                      backgroundColor: "#f0fdf4"
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "0.5rem",
-                        fontWeight: 600,
-                        color: "#166534"
+                        justifyContent: "space-between",
+                        marginBottom: "0.5rem"
                       }}
                     >
-                      <Mail size={18} />
-                      <span>ประวัติการส่งอีเมลล่าสุด</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.5rem",
+                          fontWeight: 600,
+                          color: "#166534"
+                        }}
+                      >
+                        <Mail size={18} />
+                        <span>ประวัติการส่งอีเมลล่าสุด</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="secondary-action small-action"
+                        onClick={() => setShowForm(true)}
+                        style={{ fontSize: "0.775rem", padding: "0.25rem 0.6rem" }}
+                      >
+                        ส่งซ้ำ / เปลี่ยนอีเมล
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="secondary-action small-action"
-                      onClick={() => setShowForm(true)}
-                      style={{ fontSize: "0.775rem", padding: "0.25rem 0.6rem" }}
-                    >
-                      ส่งซ้ำ / เปลี่ยนอีเมล
-                    </button>
-                  </div>
 
-                  <div style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem" }}>
-                    <div>
-                      <span style={{ color: "#6b7280" }}>ส่งไปยัง: </span>
-                      <strong style={{ color: "#111827" }}>{selectedReport.recipientEmail}</strong>
-                    </div>
-                    <div>
-                      <span style={{ color: "#6b7280" }}>เวลาที่ส่ง: </span>
-                      <strong style={{ color: "#111827" }}>
-                        {formatUpdatedAt(selectedReport.emailSentAt)}
-                      </strong>
+                    <div style={{ display: "grid", gap: "0.35rem", fontSize: "0.9rem" }}>
+                      <div>
+                        <span style={{ color: "#6b7280" }}>ส่งไปยัง: </span>
+                        <strong style={{ color: "#111827" }}>{selectedReport.recipientEmail}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: "#6b7280" }}>เวลาที่ส่ง: </span>
+                        <strong style={{ color: "#111827" }}>
+                          {formatUpdatedAt(selectedReport.emailSentAt)}
+                        </strong>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : null}
+                ) : null}
 
-              {/* ฟอร์มกรอกอีเมลสำหรับส่งใหม่/ส่งซ้ำ */}
-              {showForm ? (
+                {showForm ? (
+                  <div
+                    style={{
+                      padding: "1rem",
+                      borderRadius: "0.5rem",
+                      border: "1px solid #3b82f6",
+                      backgroundColor: "#eff6ff",
+                      display: "grid",
+                      gap: "0.75rem"
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: "#1e40af", fontSize: "0.95rem" }}>
+                      {selectedReport.recipientEmail ? "ส่งอีเมลรายงานซ้ำ" : "ส่งอีเมลรายงานให้ลูกค้า"}
+                    </div>
+
+                    <label className="field full" style={{ margin: 0 }}>
+                      <span style={{ fontSize: "0.825rem" }}>อีเมลผู้รับ</span>
+                      <input
+                        type="email"
+                        value={resendEmail}
+                        onChange={(e) => setResendEmail(e.target.value)}
+                        placeholder="customer@example.com"
+                        style={{ width: "100%", padding: "0.4rem 0.6rem", borderRadius: "0.375rem", border: "1px solid #cbd5e1" }}
+                      />
+                    </label>
+
+                    <label className="field full" style={{ margin: 0 }}>
+                      <span style={{ fontSize: "0.825rem" }}>สำเนาถึง (CC)</span>
+                      <input
+                        type="email"
+                        value={resendCc}
+                        onChange={(e) => setResendCc(e.target.value)}
+                        placeholder="cc@example.com"
+                        style={{ width: "100%", padding: "0.4rem 0.6rem", borderRadius: "0.375rem", border: "1px solid #cbd5e1" }}
+                      />
+                    </label>
+
+                    {sendError ? (
+                      <span style={{ color: "#dc2626", fontSize: "0.825rem" }}>{sendError}</span>
+                    ) : null}
+
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
+                      <button
+                        className="primary-action"
+                        type="button"
+                        disabled={isSending}
+                        onClick={() => void handleSendEmail()}
+                        style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
+                      >
+                        <Send size={16} />
+                        {isSending ? "กำลังส่ง..." : "ส่งรายงานทางอีเมล"}
+                      </button>
+                      {selectedReport.recipientEmail ? (
+                        <button
+                          className="secondary-action"
+                          type="button"
+                          onClick={() => setShowForm(false)}
+                        >
+                          ยกเลิก
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div
                   style={{
-                    padding: "1rem",
-                    borderRadius: "0.5rem",
-                    border: "1px solid #3b82f6",
-                    backgroundColor: "#eff6ff",
-                    display: "grid",
-                    gap: "0.75rem"
+                    fontSize: "0.825rem",
+                    color: "#6b7280",
+                    display: "flex",
+                    justifyContent: "space-between"
                   }}
                 >
-                  <div style={{ fontWeight: 600, color: "#1e40af", fontSize: "0.95rem" }}>
-                    {selectedReport.recipientEmail ? "ส่งอีเมลรายงานซ้ำ" : "ส่งอีเมลรายงานให้ลูกค้า"}
-                  </div>
-
-                  <label className="field full" style={{ margin: 0 }}>
-                    <span style={{ fontSize: "0.825rem" }}>อีเมลผู้รับ</span>
-                    <input
-                      type="email"
-                      value={resendEmail}
-                      onChange={(e) => setResendEmail(e.target.value)}
-                      placeholder="customer@example.com"
-                      style={{ width: "100%", padding: "0.4rem 0.6rem", borderRadius: "0.375rem", border: "1px solid #cbd5e1" }}
-                    />
-                  </label>
-
-                  <label className="field full" style={{ margin: 0 }}>
-                    <span style={{ fontSize: "0.825rem" }}>สำเนาถึง (CC)</span>
-                    <input
-                      type="email"
-                      value={resendCc}
-                      onChange={(e) => setResendCc(e.target.value)}
-                      placeholder="cc@example.com"
-                      style={{ width: "100%", padding: "0.4rem 0.6rem", borderRadius: "0.375rem", border: "1px solid #cbd5e1" }}
-                    />
-                  </label>
-
-                  {sendError ? (
-                    <span style={{ color: "#dc2626", fontSize: "0.825rem" }}>{sendError}</span>
-                  ) : null}
-
-                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                    <button
-                      className="primary-action"
-                      type="button"
-                      disabled={isSending}
-                      onClick={() => void handleSendEmail()}
-                      style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: "0.5rem" }}
-                    >
-                      <Send size={16} />
-                      {isSending ? "กำลังส่ง..." : "ส่งรายงานทางอีเมล"}
-                    </button>
-                    {selectedReport.recipientEmail ? (
-                      <button
-                        className="secondary-action"
-                        type="button"
-                        onClick={() => setShowForm(false)}
-                      >
-                        ยกเลิก
-                      </button>
-                    ) : null}
-                  </div>
+                  <span>ผู้บันทึก: {selectedReport.inspector}</span>
+                  <span>อัปเดตล่าสุด: {formatUpdatedAt(selectedReport.updatedAt)}</span>
                 </div>
-              ) : null}
-
-              <div
-                style={{
-                  fontSize: "0.825rem",
-                  color: "#6b7280",
-                  display: "flex",
-                  justifyContent: "space-between"
-                }}
-              >
-                <span>ผู้บันทึก: {selectedReport.inspector}</span>
-                <span>อัปเดตล่าสุด: {formatUpdatedAt(selectedReport.updatedAt)}</span>
               </div>
-            </div>
+            )}
 
-            <div className="modal-actions" style={{ marginTop: "1.5rem" }}>
-              <button
-                className="secondary-action"
-                type="button"
-                onClick={handleCloseModal}
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
+            {!isPreviewingPdf ? (
+              <div className="modal-actions" style={{ marginTop: "1.5rem" }}>
+                <button
+                  className="secondary-action"
+                  type="button"
+                  onClick={handleCloseModal}
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

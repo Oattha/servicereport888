@@ -18,8 +18,16 @@ export function ImageSlot({ slot, edit, onReplace, hasDefaultImage = true }: Ima
 
     const hasSupportedType = file.type === "image/jpeg" || file.type === "image/png";
     const hasSupportedExtension = /\.(?:jpe?g|png)$/i.test(file.name);
+    
     if (!hasSupportedType || !hasSupportedExtension) {
       setErrorMessage("รองรับเฉพาะไฟล์ JPG, JPEG และ PNG");
+      event.target.value = ""; // เคลียร์ค่า input เพื่อให้เลือกไฟล์เดิมซ้ำได้
+      return;
+    }
+
+    // เพิ่มการตรวจสอบขนาดไฟล์ไม่ให้เกิน 15MB ป้องกันหน้าเว็บค้างหรือหน่วยความจำเต็ม
+    if (file.size > 15 * 1024 * 1024) {
+      setErrorMessage("ขนาดไฟล์ใหญ่เกินไป (ต้องไม่เกิน 15 MB)");
       event.target.value = "";
       return;
     }

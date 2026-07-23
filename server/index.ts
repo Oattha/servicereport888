@@ -170,6 +170,8 @@ app.get("/api/reports", async (_request, response) => {
         COALESCE(users.full_name, 'User') AS inspector,
         reports.status,
         reports.progress,
+        reports.recipient_email AS "recipientEmail",  
+        reports.email_sent_at AS "emailSentAt",      
         reports.updated_at AS "updatedAt"
       FROM reports
       LEFT JOIN customers ON customers.id = reports.customer_id
@@ -285,16 +287,24 @@ app.post("/api/reports", async (request, response) => {
 });
 
 app.post("/api/reports/:id/email", async (request, response) => {
-  const { recipientEmail, fileName, pdfBase64 } = request.body as {
+  const { recipientEmail, ccEmail, fileName, pdfBase64 } = request.body as {
     recipientEmail?: string;
+    ccEmail?: string; // <-- รับค่า ccEmail เพิ่ม
     fileName?: string;
     pdfBase64?: string;
   };
+
   const normalizedEmail = recipientEmail?.trim().toLowerCase() ?? "";
+  const normalizedCc = ccEmail?.trim().toLowerCase() ?? "";
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     return response.status(400).json({ message: "กรุณากรอกอีเมลผู้รับให้ถูกต้อง" });
   }
+  
+  if (normalizedCc && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedCc)) {
+    return response.status(400).json({ message: "กรุณากรอกอีเมล CC ให้ถูกต้อง" });
+  }
+
   if (!fileName?.trim() || !pdfBase64) {
     return response.status(400).json({ message: "ไม่พบไฟล์ PDF สำหรับส่งอีเมล" });
   }
@@ -335,14 +345,18 @@ app.post("/api/reports/:id/email", async (request, response) => {
   const transporter = nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    secure: smtpPort === 465,
-    auth: { user: smtpUser, pass: smtpPass }
+    secure: false, // ใช้ false สำหรับ port 587
+    auth: { user: smtpUser, pass: smtpPass },
+    tls: {
+      rejectUnauthorized: false
+    }
   });
 
   try {
     await transporter.sendMail({
       from: smtpFrom,
       to: normalizedEmail,
+      cc: normalizedCc || undefined, // <-- ส่ง CC ถ้ามีการระบุ
       subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
       text: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
       attachments: [{ filename: fileName.trim(), content: attachment, contentType: "application/pdf" }]
@@ -358,7 +372,7 @@ app.post("/api/reports/:id/email", async (request, response) => {
     [request.params.id, normalizedEmail, sentAt]
   );
 
-  return response.json({ ok: true, recipientEmail: normalizedEmail, sentAt: sentAt.toISOString() });
+  return response.json({ ok: true, recipientEmail: normalizedEmail, ccEmail: normalizedCc, sentAt: sentAt.toISOString() });
 });
 
 app.get("/api/templates", async (_request, response) => {

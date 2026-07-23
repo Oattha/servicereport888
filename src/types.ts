@@ -32,6 +32,8 @@ export type SharedReport = {
   inspector: string;
   status: "draft" | "in_review" | "ready" | "sent";
   progress: number;
+  recipientEmail?: string | null; 
+  emailSentAt?: string | null;    
   updatedAt: string;
 };
 

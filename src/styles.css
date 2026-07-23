@@ -3374,3 +3374,316 @@ td small {
     display: grid;
   }
 }
+
+/* ==========================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================== */
+
+/* 📱 แท็บเล็ต / ไอแพด (Tablet ≤ 1024px) */
+@media (max-width: 1024px) {
+  /* ปรับ Layout หน้าสร้างรายงาน ให้ Preview ย้ายลงมาต่อด้านล่าง */
+  .report-builder {
+    grid-template-columns: 1fr;
+    padding-bottom: 120px;
+  }
+
+  .preview-panel {
+    position: static;
+    max-height: none;
+    margin-top: 24px;
+  }
+
+  .preview-body {
+    height: 700px;
+    max-height: 700px;
+  }
+
+  /* ปรับแถบตารางให้เลื่อนซ้าย-ขวาได้แบบราบรื่น */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN (TABLET & MOBILE)
+   ========================================== */
+
+/* 📱 แท็บเล็ต / ไอแพด / มือถือ (ทุกขนาดจอ ≤ 1080px) */
+@media (max-width: 1080px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  /* ปรับ Sidebar ให้เป็น Drawer สไลด์ออกสำหรับ iPad & Mobile */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    bottom: 0;
+    z-index: 99;
+    width: 280px;
+    display: flex; /* บังคับให้แสดงเป็น flex เมื่อสไลด์ออกมา */
+    transition: left 0.25s ease-in-out;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar.mobile-open {
+    left: 0; /* สไลด์โชว์เมื่อกดเปิดเมนู */
+  }
+
+  .mobile-menu {
+    display: grid;
+  }
+
+  /* Layout หน้าสร้างรายงานสำหรับ iPad */
+  .report-builder {
+    grid-template-columns: 1fr;
+    padding-bottom: 120px;
+  }
+
+  .preview-panel {
+    position: static;
+    max-height: none;
+    margin-top: 24px;
+  }
+
+  .preview-body {
+    height: 700px;
+    max-height: 700px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* เมื่อหน้าจอยุบเป็นคอลัมน์เดี่ยว */
+@media (max-width: 1024px) {
+  .preview-panel {
+    order: -1; /* สลับเอาตัวอย่าง Preview ขึ้นมาโชว์บนสุดอัตโนมัติ */
+  }
+}
+
+/* 📲 ปรับแต่งเพิ่มเติมเฉพาะจอมือถือ (Mobile ≤ 768px) */
+@media (max-width: 768px) {
+  .page-container {
+    padding: 16px 12px 100px;
+  }
+
+  .topbar {
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .topbar-title {
+    font-size: 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .template-selector-options {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-body {
+    grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
+  }
+
+  .thumb-strip {
+    display: flex;
+    overflow-x: auto;
+    max-height: none;
+    padding: 10px;
+  }
+
+  .image-thumb {
+    flex: 0 0 70px;
+    height: 60px;
+  }
+
+  .builder-footer {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    flex-direction: column;
+    height: auto;
+    padding: 10px 14px;
+    gap: 8px;
+  }
+
+  .footer-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .footer-actions button {
+    flex: 1;
+  }
+}
+/* ==========================================
+   FOR IPAD LANDSCAPE (1180x820) & RESPONSIVE
+   ========================================== */
+
+/* 📱 1. ปิด/ซ่อน Sidebar ให้กลายเป็น Drawer สไลด์ สำหรับจอ ≤ 1024px (tablet และ mobile) */
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    bottom: 0;
+    z-index: 99;
+    width: 280px;
+    display: flex;
+    transition: left 0.25s ease-in-out;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar.mobile-open {
+    left: 0;
+  }
+
+  .mobile-menu {
+    display: grid !important;
+  }
+
+  .builder-footer {
+    left: 18px;
+    right: 18px;
+  }
+}
+
+/* ==========================================
+   IPAD LANDSCAPE (1180x820) - PERFECT FIT
+   ========================================== */
+@media (min-width: 1025px) and (max-width: 1280px) {
+  /* 1. ซ่อน Sidebar ฝั่งซ้าย และลด Padding ขอบหน้าจอ */
+  .app-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: -290px;
+    bottom: 0;
+    z-index: 99;
+    width: 280px;
+    display: flex;
+    transition: left 0.25s ease-in-out;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar.mobile-open {
+    left: 0;
+  }
+
+  .mobile-menu {
+    display: grid !important;
+  }
+
+  .page-container {
+    padding: 14px 16px 80px !important;
+  }
+
+  /* 2. บังคับความกว้างไม่ให้เลื่อนซ้ายขวา และย่อตัวอักษรฟอร์ม */
+  .report-builder {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr) !important;
+    gap: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .builder-card {
+    padding: 12px 14px !important;
+  }
+
+  .builder-card h2 {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .builder-card p {
+    font-size: 11px !important;
+  }
+
+  .field span {
+    font-size: 11px !important;
+  }
+
+  .field input {
+    min-height: 32px !important;
+    font-size: 12px !important;
+    padding: 0 8px !important;
+  }
+
+  .stepper {
+    min-height: 36px !important;
+    gap: 8px !important;
+  }
+
+  .step strong {
+    font-size: 12px !important;
+  }
+
+  .template-option {
+    min-height: 50px !important;
+    padding: 6px 10px !important;
+  }
+
+  .template-option strong {
+    font-size: 12px !important;
+  }
+
+  /* 3. ย่อขนาดฝั่ง Preview PDF ให้กระชับ ไม่ดันล้นจอ */
+  .preview-panel {
+    top: 76px !important;
+  }
+
+  .preview-header strong {
+    font-size: 13px !important;
+  }
+
+  .preview-body {
+    grid-template-columns: minmax(0, 1fr) 70px !important;
+    gap: 8px !important;
+  }
+
+  .thumb-strip {
+    padding: 4px !important;
+    gap: 6px !important;
+  }
+
+  .thumb-strip > span {
+    font-size: 10px !important;
+  }
+
+  .image-thumb {
+    height: 56px !important;
+  }
+
+  /* 4. ปรับ Footer ด้านล่างให้พอดี */
+  .builder-footer {
+    left: 16px !important;
+    right: 16px !important;
+    height: 56px !important;
+    padding: 6px 14px !important;
+  }
+
+  .builder-footer .primary-action,
+  .builder-footer .secondary-action {
+    min-height: 34px !important;
+    max-height: 34px !important;
+    font-size: 12px !important;
+  }
+}

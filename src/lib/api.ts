@@ -1,23 +1,5 @@
 import type { SharedReport, UserRecord, UserRole, UserStatus } from "../types";
-
-const apiUrl = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3001";
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers
-    }
-  });
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw new Error(body?.message ?? "Request failed.");
-  }
-
-  return response.json() as Promise<T>;
-}
+import { requestJson, setAuthToken } from "./http";
 
 export type CreateUserInput = {
   fullName: string;
@@ -35,35 +17,41 @@ export type LoginResult = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  token?: string;
 };
 
 export function login(email: string, password: string) {
-  return request<LoginResult>("/api/auth/login", {
-    method: "POST",
+  return requestJson<LoginResult>('/api/auth/login', {
+    method: 'POST',
     body: JSON.stringify({ email, password })
+  }).then((res) => {
+    if (res && (res as any).token) {
+      setAuthToken((res as any).token);
+    }
+    return res;
   });
 }
 
 export function getUsers() {
-  return request<UserRecord[]>("/api/users");
+  return requestJson<UserRecord[]>('/api/users');
 }
 
 export function createUser(input: CreateUserInput) {
-  return request<UserRecord>("/api/users", {
-    method: "POST",
+  return requestJson<UserRecord>('/api/users', {
+    method: 'POST',
     body: JSON.stringify(input)
   });
 }
 
 export function deleteUser(id: string) {
-  return request<{ ok: true }>(`/api/users/${id}`, {
-    method: "DELETE"
+  return requestJson<{ ok: true }>(`/api/users/${id}`, {
+    method: 'DELETE'
   });
 }
 
 export function resolveGoogleMapsUrl(url: string) {
-  return request<{ resolvedUrl: string }>("/api/maps/resolve", {
-    method: "POST",
+  return requestJson<{ resolvedUrl: string }>('/api/maps/resolve', {
+    method: 'POST',
     body: JSON.stringify({ url })
   });
 }
@@ -81,25 +69,29 @@ export type CompleteReportInput = {
 };
 
 export function getReports() {
-  return request<SharedReport[]>("/api/reports");
+  return requestJson<SharedReport[]>('/api/reports');
 }
 
 export function completeReport(input: CompleteReportInput) {
-  return request<SharedReport>("/api/reports", {
-    method: "POST",
+  return requestJson<SharedReport>('/api/reports', {
+    method: 'POST',
     body: JSON.stringify(input)
   });
 }
 
 export type SendReportEmailInput = {
   recipientEmail: string;
+  ccEmail?: string;
   fileName: string;
   pdfBase64: string;
 };
 
 export function sendReportEmail(reportId: string, input: SendReportEmailInput) {
-  return request<{ ok: true; recipientEmail: string; sentAt: string }>(`/api/reports/${reportId}/email`, {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
+  return requestJson<{ ok: true; recipientEmail: string; ccEmail?: string; sentAt: string }>(
+    `/api/reports/${reportId}/email`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input)
+    }
+  );
 }

@@ -8,9 +8,10 @@ import {
   Menu,
   Search,
   ShieldCheck,
-  Users
+  Users,
+  X
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { AppSection } from "../types";
 
 type AppShellProps = {
@@ -25,9 +26,30 @@ const navItems = [
 ] as const;
 
 export function AppShell({ activeSection, onNavigate, onLogout, children }: AppShellProps) {
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  function handleNavClick(section: AppSection) {
+    onNavigate(section);
+    setIsMobileNavOpen(false); // ปิดเมนูเมื่อคลิกเลือก
+  }
+
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {/* Backdrop สีดำเบลอๆ เวลาเปิด Sidebar บนมือถือ */}
+      {isMobileNavOpen ? (
+        <div
+          onClick={() => setIsMobileNavOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.4)",
+            backdropFilter: "blur(2px)",
+            zIndex: 90
+          }}
+        />
+      ) : null}
+
+      <aside className={isMobileNavOpen ? "sidebar mobile-open" : "sidebar"}>
         <div className="app-brand">
           <div className="app-brand-mark">
             <ShieldCheck size={24} aria-hidden="true" />
@@ -36,6 +58,14 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
             <strong>TEST TRUE</strong>
             <span>SAFETY FUTURE SERVICE</span>
           </div>
+          <button
+            className="icon-button mobile-menu"
+            type="button"
+            onClick={() => setIsMobileNavOpen(false)}
+            style={{ marginLeft: "auto" }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <nav className="side-nav" aria-label="Main navigation">
@@ -45,7 +75,7 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
               key={id}
               className={activeSection === id ? "nav-item active" : "nav-item"}
               type="button"
-              onClick={() => onNavigate(id)}
+              onClick={() => handleNavClick(id)}
             >
               <Icon size={19} aria-hidden="true" />
               <span>{label}</span>
@@ -54,7 +84,7 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
           <button
             className={activeSection === "my-reports" ? "nav-item active" : "nav-item"}
             type="button"
-            onClick={() => onNavigate("my-reports")}
+            onClick={() => handleNavClick("my-reports")}
           >
             <FileText size={19} aria-hidden="true" />
             <span>รายงานของฉัน</span>
@@ -62,7 +92,7 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
           <button
             className={activeSection === "all-reports" ? "nav-item active" : "nav-item"}
             type="button"
-            onClick={() => onNavigate("all-reports")}
+            onClick={() => handleNavClick("all-reports")}
           >
             <FileArchive size={19} aria-hidden="true" />
             <span>รายงานทั้งหมด</span>
@@ -72,7 +102,7 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
           <button
             className={activeSection === "users" ? "nav-item active" : "nav-item"}
             type="button"
-            onClick={() => onNavigate("users")}
+            onClick={() => handleNavClick("users")}
           >
             <Users size={19} aria-hidden="true" />
             <span>ผู้ใช้งาน</span>
@@ -93,7 +123,12 @@ export function AppShell({ activeSection, onNavigate, onLogout, children }: AppS
 
       <div className="workspace">
         <header className="topbar">
-          <button className="icon-button mobile-menu" type="button" aria-label="Open menu">
+          <button
+            className="icon-button mobile-menu"
+            type="button"
+            aria-label="Open menu"
+            onClick={() => setIsMobileNavOpen(true)}
+          >
             <Menu size={20} aria-hidden="true" />
           </button>
           <h1 className="topbar-title">สร้างรายงานตรวจสอบอาคาร (ประจำปี)</h1>

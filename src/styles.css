@@ -3745,3 +3745,22 @@ td small {
   padding: 0 14px;      
   font-size: 14px;      
 } }
+
+/* 🔒 ล็อกไม่ให้กล่องฟอร์มทุกตัวในฝั่งซ้ายดันขนาดขยายล้นเกินพื้นที่ Grid */
+.builder-main,
+.builder-main .builder-card,
+.map-location-field,
+.map-search-row,
+.map-search-box {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* ล็อกแผนที่และปุ่มในหน้า 15 ให้ย่อ-ขยายตามความกว้างการ์ดแม่เสมอ */
+.map-location-grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}

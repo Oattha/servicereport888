@@ -89,7 +89,7 @@ import { createReportPdf } from "../utils/reportRenderer";
 import { ReplaceImage } from "../utils/templateEditing";
 import { saveReportDraft } from "../lib/reportDrafts";
 import { deleteReportDraft } from "../lib/reportDrafts";
-import { completeReport, sendReportEmail } from "../lib/api";
+import { completeReport, sendReportEmail, uploadImage } from "../lib/api";
 
 const buildingTypes = [
   "อาคารสูง",
@@ -303,9 +303,25 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     ? maintenancePlanPage19Values
     : maintenancePlanPage18Values;
 
-  function handleReplaceImage(slotKey: string, file: File) {
-    setImageEdits((current) => ReplaceImage(current, slotKey, file));
-    setImageRevision((current) => current + 1);
+  async function handleReplaceImage(slotKey: string, file: File) {
+    try {
+      // 1. ส่งไฟล์ไปอัปโหลดบน Cloudflare R2
+      const uploadedUrl = await uploadImage(file);
+
+      // 2. บันทึก URL ที่ได้ลงใน State พร้อมใส่ fileName
+      setImageEdits((current) => ({
+        ...current,
+        [slotKey]: {
+          slotKey,
+          objectUrl: uploadedUrl,
+          fileName: file.name, // 👈 เพิ่มฟิลด์นี้เพื่อให้ Type สมบูรณ์
+          file
+        }
+      }));
+      setImageRevision((current) => current + 1);
+    } catch (err) {
+      alert("ไม่สามารถอัปโหลดรูปภาพได้ กรุณาลองใหม่อีกครั้ง");
+    }
   }
 
   function getFieldValue(fieldKey: string) {
@@ -1483,9 +1499,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         <div className="preview-body">
           <div className="pdf-page pdf-template-page">
             <div className="pdf-template-canvas" data-existing-year-edit={coverYearText}>
-              {selectedTemplateId === "annual-inspection" && currentTemplatePage === 14
-                ? null
-                : <div className="locked-overlay">LOCKED TEMPLATE</div>}
+              {selectedTemplateId === "annual-inspection" && (currentTemplatePage === 14 || currentTemplatePage === 15)
+  ? null
+  : <div className="locked-overlay">LOCKED TEMPLATE</div>}
               <ReportPdfPreview
                 page={currentTemplatePage}
                 renderState={renderState}

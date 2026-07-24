@@ -110,72 +110,90 @@ export function AllReportsPage() {
     }
   }
 
-  // 💡 ฟังก์ชันสร้างและเปิดดูตัวอย่างไฟล์ PDF ทางหน้าจอ
-  // 💡 แก้ไขฟังก์ชันนี้ให้เปิดไฟล์ PDF ในแท็บใหม่ทันที (รองรับมือถือและเดสก์ท็อปสมบูรณ์แบบ)
+  // 💡 ฟังก์ชันดึง RenderState จากรายงานจริง หรือใช้ Fallback
+  function getReportRenderState(report: SharedReport & { data?: ReportRenderState }): ReportRenderState {
+    if (report.data) {
+      return report.data;
+    }
+
+    return {
+      templateId: "annual-inspection",
+      maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
+      maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
+      maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
+      maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
+      maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
+      maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
+      fieldValues: {
+        ...defaultTemplateFieldValues,
+        owner_company: report.customer,
+        building_name: report.building,
+        customer_email: resendEmail || "customer@example.com"
+      },
+      inspectionChecks: defaultInspectionChecks,
+      page14Checks: defaultPage14Checkboxes,
+      page17Owner: {},
+      page17Occupant: {},
+      page17BuildingTypes: {
+        high_rise: false,
+        extra_large: false,
+        assembly: false,
+        theater: false,
+        hotel_80_rooms: false,
+        entertainment_venue_200_sqm: false,
+        residential_2000_sqm: false,
+        factory_5000_sqm: false,
+        other: false
+      },
+      page17OtherText: "",
+      page18Checks: defaultPage18Checks,
+      page18Text: defaultPage18Text,
+      page18Materials: defaultPage18Materials,
+      page23Results: defaultPage23Results,
+      page23Remarks: defaultPage23Remarks,
+      page24Results: defaultPage24Results,
+      page24Remarks: defaultPage24Remarks,
+      page25Signatures: defaultPage25Signatures,
+      imageEdits: {},
+      mapLocation: {
+        latitude: "",
+        longitude: "",
+        googleMapsUrl: "",
+        mapScreenshotUrl: "",
+        uploadedImageUrl: "",
+        uploadedImageName: "",
+        mapImageSource: "",
+        satellite: false,
+        placeName: "",
+        address: ""
+      }
+    };
+  }
+
   async function handlePreviewPdf() {
     if (!selectedReport) return;
+
+    // เปิดแท็บใหม่ก่อนเพื่อกัน Browser บล็อก Pop-up
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) {
+      previewWindow.document.write("<h3 style='font-family: sans-serif; padding: 2rem;'>กำลังสร้างเอกสาร PDF กรุณารอสักครู่...</h3>");
+    }
+
     setIsGeneratingPreview(true);
     try {
-      const renderState: ReportRenderState = {
-        templateId: "annual-inspection",
-        maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
-        maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
-        maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
-        maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
-        maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
-        maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
-        fieldValues: {
-          ...defaultTemplateFieldValues,
-          owner_company: selectedReport.customer,
-          building_name: selectedReport.building,
-          customer_email: resendEmail || "customer@example.com"
-        },
-        inspectionChecks: defaultInspectionChecks,
-        page14Checks: defaultPage14Checkboxes,
-        page17Owner: {},
-        page17Occupant: {},
-        page17BuildingTypes: {
-          high_rise: false,
-          extra_large: false,
-          assembly: false,
-          theater: false,
-          hotel_80_rooms: false,
-          entertainment_venue_200_sqm: false,
-          residential_2000_sqm: false,
-          factory_5000_sqm: false,
-          other: false
-        },
-        page17OtherText: "",
-        page18Checks: defaultPage18Checks,
-        page18Text: defaultPage18Text,
-        page18Materials: defaultPage18Materials,
-        page23Results: defaultPage23Results,
-        page23Remarks: defaultPage23Remarks,
-        page24Results: defaultPage24Results,
-        page24Remarks: defaultPage24Remarks,
-        page25Signatures: defaultPage25Signatures,
-        imageEdits: {},
-        mapLocation: {
-          latitude: "",
-          longitude: "",
-          googleMapsUrl: "",
-          mapScreenshotUrl: "",
-          uploadedImageUrl: "",
-          uploadedImageName: "",
-          mapImageSource: "",
-          satellite: false,
-          placeName: "",
-          address: ""
-        }
-      };
+      const renderState = getReportRenderState(selectedReport as SharedReport & { data?: ReportRenderState });
 
       const pdfBytes = await createReportPdf(renderState);
       const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       
-      // 💡 สั่งเปิดแท็บใหม่ทันที
-      window.open(url, "_blank");
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, "_blank");
+      }
     } catch (err) {
+      if (previewWindow) previewWindow.close();
       alert(err instanceof Error ? err.message : "ไม่สามารถสร้างตัวอย่าง PDF ได้");
     } finally {
       setIsGeneratingPreview(false);
@@ -203,59 +221,7 @@ export function AllReportsPage() {
 
     try {
       const pdfFileName = `รายงานตรวจสอบอาคาร-${selectedReport.building}.pdf`;
-      
-      const renderState: ReportRenderState = {
-        templateId: "annual-inspection",
-        maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
-        maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
-        maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
-        maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
-        maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
-        maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
-        fieldValues: {
-          ...defaultTemplateFieldValues,
-          owner_company: selectedReport.customer,
-          building_name: selectedReport.building,
-          customer_email: normalizedEmail
-        },
-        inspectionChecks: defaultInspectionChecks,
-        page14Checks: defaultPage14Checkboxes,
-        page17Owner: {},
-        page17Occupant: {},
-        page17BuildingTypes: {
-          high_rise: false,
-          extra_large: false,
-          assembly: false,
-          theater: false,
-          hotel_80_rooms: false,
-          entertainment_venue_200_sqm: false,
-          residential_2000_sqm: false,
-          factory_5000_sqm: false,
-          other: false
-        },
-        page17OtherText: "",
-        page18Checks: defaultPage18Checks,
-        page18Text: defaultPage18Text,
-        page18Materials: defaultPage18Materials,
-        page23Results: defaultPage23Results,
-        page23Remarks: defaultPage23Remarks,
-        page24Results: defaultPage24Results,
-        page24Remarks: defaultPage24Remarks,
-        page25Signatures: defaultPage25Signatures,
-        imageEdits: {},
-        mapLocation: {
-          latitude: "",
-          longitude: "",
-          googleMapsUrl: "",
-          mapScreenshotUrl: "",
-          uploadedImageUrl: "",
-          uploadedImageName: "",
-          mapImageSource: "",
-          satellite: false,
-          placeName: "",
-          address: ""
-        }
-      };
+      const renderState = getReportRenderState(selectedReport as SharedReport & { data?: ReportRenderState });
 
       const pdfBytes = await createReportPdf(renderState);
       const pdfBase64 = await pdfBytesToBase64(pdfBytes);

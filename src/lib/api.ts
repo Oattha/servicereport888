@@ -95,3 +95,15 @@ export function sendReportEmail(reportId: string, input: SendReportEmailInput) {
     }
   );
 }
+
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await requestJson<{ url: string }>('/api/upload', {
+    method: 'POST',
+    body: formData
+  });
+
+  return res.url;
+}

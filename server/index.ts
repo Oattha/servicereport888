@@ -7,11 +7,25 @@ import { pool } from "./db";
 import { signToken, authMiddleware, adminOnly, type AuthRequest } from "./auth";
 
 const app = express();
-const port = Number(process.env.API_PORT ?? 3001);
+const port = Number(process.env.PORT ?? process.env.API_PORT ?? 3001);
 const host = process.env.API_HOST ?? "127.0.0.1";
 const webOrigin = process.env.WEB_ORIGIN ?? "http://127.0.0.1:5173";
 
-app.use(cors({ origin: webOrigin }));
+import multer from "multer";
+import { uploadToCloudinary } from './src/cloudinary';
+
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } }); // ลิมิตรูปละ 10MB
+
+// 1. อนุญาต CORS ทุก Origin พร้อมจัดการ OPTIONS Request ทั้งหมด
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    credentials: false,
+  })
+);
+
 app.use(express.json({ limit: "30mb" }));
 
 // Security headers middleware
@@ -19,7 +33,6 @@ app.use((req, res, next) => {
   res.set("X-Content-Type-Options", "nosniff");
   res.set("X-Frame-Options", "DENY");
   res.set("X-XSS-Protection", "1; mode=block");
-  res.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   next();
 });
 
@@ -226,7 +239,8 @@ app.get("/api/reports", authMiddleware, async (_request, response) => {
           reports.progress,
           reports.recipient_email AS "recipientEmail",  
           reports.email_sent_at AS "emailSentAt",      
-          reports.updated_at AS "updatedAt"
+          reports.updated_at AS "updatedAt",
+          reports.data
         FROM reports
         LEFT JOIN customers ON customers.id = reports.customer_id
         LEFT JOIN buildings ON buildings.id = reports.building_id
@@ -252,7 +266,8 @@ app.post("/api/reports", authMiddleware, async (request, response) => {
     templateName,
     templatePages,
     inspectionDate,
-    inspectorId
+    inspectorId,
+    data
   } = request.body as {
     ownerCompany?: string;
     customerEmail?: string;
@@ -263,6 +278,7 @@ app.post("/api/reports", authMiddleware, async (request, response) => {
     templatePages?: number;
     inspectionDate?: string;
     inspectorId?: string;
+    data?: unknown;
   };
 
   if (!ownerCompany?.trim() || !buildingName?.trim() || !templateCode?.trim() || !templateName?.trim()) {
@@ -301,16 +317,16 @@ app.post("/api/reports", authMiddleware, async (request, response) => {
     const validInspectorId = validInspectorResult.rows[0]?.id ?? null;
     const reportNo = `RPT-${Date.now()}-${randomUUID().slice(0, 8).toUpperCase()}`;
     const reportResult = await client.query(
-      `
-        INSERT INTO reports (
-          report_no, customer_id, building_id, template_id, inspector_id,
-          status, progress, inspection_date
-        )
-        VALUES ($1, $2, $3, $4, $5, 'ready', 100, NULLIF($6, '')::date)
-        RETURNING id
-      `,
-      [reportNo, customerId, buildingId, templateId, validInspectorId, inspectionDate ?? ""]
-    );
+    `
+      INSERT INTO reports (
+        report_no, customer_id, building_id, template_id, inspector_id,
+        status, progress, inspection_date, data
+      )
+      VALUES ($1, $2, $3, $4, $5, 'ready', 100, NULLIF($6, '')::date, $7)
+      RETURNING id
+    `,
+    [reportNo, customerId, buildingId, templateId, validInspectorId, inspectionDate ?? "", data ? JSON.stringify(data) : null]
+  );
     await client.query("COMMIT");
 
     const savedReport = await pool.query(
@@ -457,6 +473,44 @@ app.get("/api/templates", authMiddleware, async (_request, response) => {
   }
 });
 
-app.listen(port, host, () => {
-  console.log(`API server running at http://${host}:${port}`);
+// API สำหรับอัปโหลดรูปภาพเข้า Cloudflare R2
+//app.post("/api/upload", authMiddleware, upload.single("file"), async (req, res) => {
+//  try {
+//    if (!req.file) {
+//      return res.status(400).json({ message: "กรุณาแนบไฟล์รูปภาพ" });
+//    }
+
+//    const imageUrl = await uploadToR2(
+//      req.file.buffer,
+//      req.file.originalname,
+//      req.file.mimetype
+//    );
+
+//    return res.json({ url: imageUrl });
+//  } catch (error) {
+//    console.error("[Upload error]", error);
+//    return res.status(500).json({ message: "ไม่สามารถอัปโหลดรูปภาพได้" });
+//  }
+//});
+
+// API สำหรับอัปโหลดรูปภาพเข้า Cloudinary
+app.post("/api/upload", authMiddleware, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "กรุณาแนบไฟล์รูปภาพ" });
+    }
+
+    // เรียกใช้ Cloudinary
+    const imageUrl = await uploadToCloudinary(req.file.buffer);
+
+    return res.json({ url: imageUrl });
+  } catch (error) {
+    console.error("[Upload error]", error);
+    return res.status(500).json({ message: "ไม่สามารถอัปโหลดรูปภาพได้" });
+  }
+});
+
+
+app.listen(port, "0.0.0.0", () => {
+  console.log(`API server running on port ${port}`);
 });

@@ -734,26 +734,23 @@ async function drawChecklistFrequencyHeaders(pdf: PDFDocument) {
 
 async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderState) {
   const logoUrl = DEFAULT_HEADER_LOGO_URL;
-  const coverLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95, "left");
-  const headerLogoBytes = await imageUrlToContainPngBytes(logoUrl, 401, 95, "left");
+  const coverLogoBytes = await imageUrlToContainPngBytes(logoUrl, 240, 55, "left");
+  const headerLogoBytes = await imageUrlToContainPngBytes(logoUrl, 210, 42, "left");
   const coverLogo = await pdf.embedPng(coverLogoBytes);
   const headerLogo = await pdf.embedPng(headerLogoBytes);
 
   pdf.getPages().forEach((page, index) => {
-    const resources = page.node.Resources();
-    const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
-    if (!xObjects) return;
-
-    xObjects.set(PDFName.of(index === 0 ? "Im1" : "Im0"), index === 0 ? coverLogo.ref : headerLogo.ref);
-
     if (index === 0) {
-      page.drawRectangle({ x: 28, y: 704, width: 250, height: 68, color: rgb(1, 1, 1) });
-      page.drawImage(coverLogo, { x: 40, y: 713, width: 210, height: 50 });
+      page.drawRectangle({ x: 25, y: 700, width: 230, height: 75, color: rgb(1, 1, 1) });
+      page.drawImage(coverLogo, { x: 28, y: 708, width: 210, height: 50 });
       return;
     }
 
-    page.drawRectangle({ x: 30, y: 740, width: 205, height: 40, color: rgb(1, 1, 1) });
-    page.drawImage(headerLogo, { x: 58, y: 744, width: 150, height: 22 });
+    // 💡 ปรับ x เป็น 36 (ชิดซ้ายสวยพอดี) และ y เป็น 745 (ขยับขึ้นสูง ไม่ทับเส้นบรรทัด)
+    page.drawRectangle({ x: 32, y: 860, width: 167, height: 38, color: rgb(1, 1, 1) });
+    
+    // 💡 วางรูปโลโก้ใหม่ที่พิกัด x: 34, y: 742
+    page.drawImage(headerLogo, { x: 32, y: 747, width: 167, height: 35 });
   });
 }
 
@@ -1195,9 +1192,9 @@ async function createPage18TextOverlayBytes(state: ReportRenderState) {
   );
 
   const valueSlots = [
-    { value: state.page18Text.aboveGroundFloors, x: 252, y: 190, width: 16, baseline: 207 },
-    { value: state.page18Text.basementFloors, x: 180, y: 209, width: 14, baseline: 226 },
-    { value: state.page18Text.accessRoadWidth, x: 205, y: 228, width: 16, baseline: 245 }
+    { value: state.page18Text.aboveGroundFloors, x: 252, y: 190, width: 16, baseline: 202.5 },
+    { value: state.page18Text.basementFloors, x: 180, y: 209, width: 14, baseline: 221.5 },
+    { value: state.page18Text.accessRoadWidth, x: 205, y: 228, width: 16, baseline: 240.5 }
   ];
   valueSlots.forEach((slot) => {
     erase(slot.x, slot.y, slot.width, 20);
@@ -3056,13 +3053,7 @@ if (!targetPage || targetPage === 1) {
   if (!targetPage || targetPage === 26) {
     await replacePage25Signatures(pdf, state);
   }
-
-  if (!targetPage || targetPage === 12 || targetPage === 13) {
-    removeDefaultChecklistMarks(pdf);
-    await drawChecklistFrequencyHeaders(pdf);
-    await replaceChecklistMarks(pdf, state);
-  }
-
+  
   // ปรับโลโก้หัวกระดาษและรูปภาพทั่วไป
   await replaceDefaultHeaderLogos(pdf, state);
   await replacePdfImageXObjects(pdf, state);

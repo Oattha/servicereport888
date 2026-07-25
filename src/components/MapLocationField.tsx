@@ -8,7 +8,7 @@ import {
 } from "@react-google-maps/api";
 import html2canvas from "html2canvas";
 import { useDropzone } from "react-dropzone";
-import { Camera, Crosshair, ImagePlus, MapPin, Satellite, Search, Upload } from "lucide-react";
+import { Camera, Crosshair, ExternalLink, ImagePlus, MapPin, Satellite, Search, Upload } from "lucide-react";
 import { resolveGoogleMapsUrl } from "../lib/api";
 import type { MapLocationValue } from "../types";
 import { buildGoogleMapsUrl, isValidCoordinate, parseCoordinatesFromGoogleMapsUrl } from "../utils/mapLocation";
@@ -97,6 +97,7 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
           ...latestValue,
           uploadedImageUrl,
           uploadedImageName: file.name,
+          mapScreenshotUrl: uploadedImageUrl,
           mapImageSource: "upload"
         });
       } catch {
@@ -232,14 +233,20 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
     }
   }
 
+  const handleOpenGoogleMaps = () => {
+    const url = value.googleMapsUrl.trim() || "https://www.google.com/maps";
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <section className="map-location-field">
       <div className="map-location-header">
         <div>
           <span>Page 15</span>
           <h2>ตำแหน่งแผนที่และรูปสถานที่</h2>
-          <p>ค้นหาสถานที่ ปักหมุด จับภาพแผนที่ หรืออัปโหลดรูปสำหรับแสดงใน PDF</p>
+          <p>กรอกลิงก์ Google Maps และอัปโหลดรูปภาพแผนที่จากการแคปหน้าจอลงในกรอบด้านล่าง</p>
         </div>
+        {/*
         <button
           className={value.satellite ? "secondary-action small-action active" : "secondary-action small-action"}
           type="button"
@@ -248,8 +255,10 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
           <Satellite size={16} aria-hidden="true" />
           Satellite
         </button>
+        */}
       </div>
 
+      {/* 
       <div className="map-search-row">
         {apiKey && isLoaded ? (
           <Autocomplete onLoad={(autocomplete) => { autocompleteRef.current = autocomplete; }} onPlaceChanged={handlePlaceChanged}>
@@ -280,7 +289,9 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
           {isCapturing ? "Capturing..." : "Capture Map"}
         </button>
       </div>
+      */}
 
+      {/*
       <div className="map-location-grid">
         <div className="map-capture-surface" ref={mapCaptureRef}>
           {apiKey && isLoaded ? (
@@ -311,60 +322,114 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
             </div>
           )}
         </div>
+      */}
 
-        <div className="map-side-panel">
-          <div className="form-grid compact">
-            <label className="field">
-              <span>Latitude</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "1rem" }}>
+        <div className="form-grid compact">
+          {/*
+          <label className="field">
+            <span>Latitude</span>
+            <input
+              aria-invalid={value.latitude !== "" && !isValidCoordinate(value.latitude, -90, 90)}
+              inputMode="decimal"
+              max="90"
+              min="-90"
+              step="any"
+              type="number"
+              value={value.latitude}
+              onChange={(event) => handleCoordinateInput("latitude", event.target.value)}
+            />
+          </label>
+          */}
+
+          {/* 
+          <label className="field">
+            <span>Longitude</span>
+            <input
+              aria-invalid={value.longitude !== "" && !isValidCoordinate(value.longitude, -180, 180)}
+              inputMode="decimal"
+              max="180"
+              min="-180"
+              step="any"
+              type="number"
+              value={value.longitude}
+              onChange={(event) => handleCoordinateInput("longitude", event.target.value)}
+            />
+          </label>
+          */}
+
+          <label className="field full">
+            <span>Google Maps URL</span>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", width: "100%" }}>
               <input
-                aria-invalid={value.latitude !== "" && !isValidCoordinate(value.latitude, -90, 90)}
-                inputMode="decimal"
-                max="90"
-                min="-90"
-                step="any"
-                type="number"
-                value={value.latitude}
-                onChange={(event) => handleCoordinateInput("latitude", event.target.value)}
+                value={value.googleMapsUrl}
+                onChange={(event) => handleGoogleMapsUrlInput(event.target.value)}
+                placeholder="https://maps.app.goo.gl/..."
+                style={{ flex: "1 1 auto", minWidth: "0" }}
               />
-            </label>
-            <label className="field">
-              <span>Longitude</span>
-              <input
-                aria-invalid={value.longitude !== "" && !isValidCoordinate(value.longitude, -180, 180)}
-                inputMode="decimal"
-                max="180"
-                min="-180"
-                step="any"
-                type="number"
-                value={value.longitude}
-                onChange={(event) => handleCoordinateInput("longitude", event.target.value)}
-              />
-            </label>
-            <label className="field full">
-              <span>Google Maps URL</span>
-              <input value={value.googleMapsUrl} onChange={(event) => handleGoogleMapsUrlInput(event.target.value)} />
-            </label>
-          </div>
-
-          <div {...getRootProps({ className: isDragActive ? "map-upload-zone active" : "map-upload-zone" })}>
-            <input {...getInputProps()} />
-            <Upload size={20} aria-hidden="true" />
-            <strong>Upload Image</strong>
-            <span>{value.uploadedImageName || "Drop image here or click to upload"}</span>
-          </div>
-
-          <div className="map-preview-grid">
-            <div>
-              <strong>Map Screenshot</strong>
-              {value.mapScreenshotUrl ? <img alt="Map screenshot preview" src={value.mapScreenshotUrl} /> : <span><Camera size={18} />No capture</span>}
+              <button
+                type="button"
+                onClick={handleOpenGoogleMaps}
+                title="เปิด Google Maps ในแท็บใหม่เพื่อค้นหา/แคปหน้าจอ"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "0.35rem",
+                  padding: "0.6rem 1rem",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  width: "auto",
+                  height: "38px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  backgroundColor: "#ffffff",
+                  color: "#1e293b",
+                  fontWeight: 500,
+                  fontSize: "0.875rem",
+                  cursor: "pointer"
+                }}
+              >
+                <ExternalLink size={16} aria-hidden="true" />
+                เปิด Google Maps
+              </button>
             </div>
-            <div>
-              <strong>Uploaded Image</strong>
-              {value.uploadedImageUrl ? <img alt="Uploaded location preview" src={value.uploadedImageUrl} /> : <span><ImagePlus size={18} />No image</span>}
-            </div>
+          </label>
+        </div>
+
+        <div {...getRootProps({ className: isDragActive ? "map-upload-zone active" : "map-upload-zone" })}>
+          <input {...getInputProps()} />
+          <Upload size={28} aria-hidden="true" />
+          <strong>อัปโหลดรูปภาพแผนที่ (แคปหน้าจอ)</strong>
+          <span>{value.uploadedImageName || "ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์รูปภาพ"}</span>
+        </div>
+
+        {(value.uploadedImageUrl || value.mapScreenshotUrl) && (
+          <div className="map-preview-single" style={{ textAlign: "center", marginTop: "0.5rem" }}>
+            <span style={{ fontSize: "0.85rem", color: "#64748b", display: "block", marginBottom: "0.5rem" }}>
+              ตัวอย่างรูปภาพแผนที่ที่จะแสดงบน PDF หน้า 15
+            </span>
+            <img
+              alt="Uploaded map preview"
+              src={value.uploadedImageUrl || value.mapScreenshotUrl}
+              style={{ maxWidth: "100%", maxHeight: "280px", borderRadius: "8px", border: "1px solid #e2e8f0" }}
+            />
           </div>
+        )}
+      </div>
+
+      {/*
+      <div className="map-preview-grid">
+        <div>
+          <strong>Map Screenshot</strong>
+          {value.mapScreenshotUrl ? <img alt="Map screenshot preview" src={value.mapScreenshotUrl} /> : <span><Camera size={18} />No capture</span>}
+        </div>
+        <div>
+          <strong>Uploaded Image</strong>
+          {value.uploadedImageUrl ? <img alt="Uploaded location preview" src={value.uploadedImageUrl} /> : <span><ImagePlus size={18} />No image</span>}
         </div>
       </div>
+      */}
 
       {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
     </section>

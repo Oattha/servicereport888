@@ -547,18 +547,24 @@ async function imageUrlToContainPngBytes(
   const sourceY = minY < maxY ? minY : 0;
   const sourceWidth = minX < maxX ? maxX - minX + 1 : image.naturalWidth;
   const sourceHeight = minY < maxY ? maxY - minY + 1 : image.naturalHeight;
-  const scale = Math.min(targetWidth / sourceWidth, targetHeight / sourceHeight);
+
+  // 💡 เพิ่ม renderScale เป็น 4 เท่า เพื่อความคมชัดระดับ HD คมกริบ
+  const renderScale = 4;
+  const canvasWidth = targetWidth * renderScale;
+  const canvasHeight = targetHeight * renderScale;
+
+  const scale = Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight);
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
   const canvas = document.createElement("canvas");
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare header logo");
 
   context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, targetWidth, targetHeight);
-  const drawX = horizontalAlign === "left" ? 0 : (targetWidth - drawWidth) / 2;
+  context.fillRect(0, 0, canvasWidth, canvasHeight);
+  const drawX = horizontalAlign === "left" ? 0 : (canvasWidth - drawWidth) / 2;
   context.drawImage(
     image,
     sourceX,
@@ -566,7 +572,7 @@ async function imageUrlToContainPngBytes(
     sourceWidth,
     sourceHeight,
     drawX,
-    (targetHeight - drawHeight) / 2,
+    (canvasHeight - drawHeight) / 2,
     drawWidth,
     drawHeight
   );
@@ -750,7 +756,7 @@ async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderSt
     page.drawRectangle({ x: 32, y: 860, width: 167, height: 38, color: rgb(1, 1, 1) });
     
     // 💡 วางรูปโลโก้ใหม่ที่พิกัด x: 34, y: 742
-    page.drawImage(headerLogo, { x: 32, y: 747, width: 167, height: 35 });
+    page.drawImage(headerLogo, { x: 32, y: 745.5, width: 167, height: 32.7 });
   });
 }
 
@@ -1192,9 +1198,9 @@ async function createPage18TextOverlayBytes(state: ReportRenderState) {
   );
 
   const valueSlots = [
-    { value: state.page18Text.aboveGroundFloors, x: 255, y: 190, width: 16, baseline: 199.5 }, // 👈 ลดเหลือ 198.5
-    { value: state.page18Text.basementFloors, x: 184, y: 209, width: 14, baseline: 219 },     // 👈 ลดเหลือ 217.5
-    { value: state.page18Text.accessRoadWidth, x: 208, y: 228, width: 16, baseline: 238 }    // 👈 ลดเหลือ 236.5
+    { value: state.page18Text.aboveGroundFloors, x: 255, y: 190, width: 0, baseline: 199.5 }, // 👈 ลดเหลือ 198.5
+    { value: state.page18Text.basementFloors, x: 183, y: 209, width: 0, baseline: 219 },     // 👈 ลดเหลือ 217.5
+    { value: state.page18Text.accessRoadWidth, x: 207, y: 228, width: 0, baseline: 238 }    // 👈 ลดเหลือ 236.5
   ];
   valueSlots.forEach((slot) => {
     erase(slot.x, slot.y, slot.width, 20);

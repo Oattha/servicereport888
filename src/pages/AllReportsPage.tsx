@@ -61,7 +61,7 @@ export function AllReportsPage() {
   const [sendSuccess, setSendSuccess] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  // 💡 State สำหรับควบคุมการแสดงตัวอย่าง PDF
+  //  State สำหรับควบคุมการแสดงตัวอย่าง PDF
   const [isPreviewingPdf, setIsPreviewingPdf] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -110,7 +110,7 @@ export function AllReportsPage() {
     }
   }
 
-  // 💡 ฟังก์ชันดึง RenderState จากรายงานจริง หรือใช้ Fallback
+  //  ฟังก์ชันดึง RenderState จากรายงานจริง หรือใช้ Fallback
   function getReportRenderState(report: SharedReport & { data?: ReportRenderState }): ReportRenderState {
     if (report.data) {
       return report.data;
@@ -419,10 +419,10 @@ export function AllReportsPage() {
               </button>
             </div>
 
-            {/* 💡 ส่วนแสดงผลตัวอย่าง PDF แบบฝังหน้าจอ (Iframe) */}
+            {/*  ส่วนแสดงผลตัวอย่าง PDF แบบฝังหน้าจอ (Iframe) */}
             {isPreviewingPdf ? (
               <div style={{ marginTop: "1rem", display: "grid", gap: "1rem" }}>
-                {/* 💡 เปลี่ยนจาก iframe มาใช้ object + embed เพื่อให้มือถือเลื่อนนิ้วสไลด์ได้ปกติ */}
+                {/*  เปลี่ยนจาก iframe มาใช้ object + embed เพื่อให้มือถือเลื่อนนิ้วสไลด์ได้ปกติ */}
                 <div style={{ 
                   width: "100%", 
                   height: "480px", 
@@ -493,7 +493,7 @@ export function AllReportsPage() {
                     </span>
                   </div>
 
-                  {/* 💡 ปุ่มกดเปิดดูตัวอย่าง PDF */}
+                  {/*  ปุ่มกดเปิดดูตัวอย่าง PDF */}
                   <button
                     className="secondary-action small-action"
                     type="button"

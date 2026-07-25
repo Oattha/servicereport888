@@ -4,6 +4,7 @@ import {
   Check,
   Download,
   Expand,
+  Loader2,
   FileText,
   LockKeyhole,
   Mail,
@@ -149,6 +150,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [completeSaveStatus, setCompleteSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [completedReportId, setCompletedReportId] = useState<string | null>(null);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
   const [recipientEmail, setRecipientEmail] = useState(initialState?.fieldValues.customer_email ?? "");
   const [ccEmail, setCcEmail] = useState("");
   const [emailSendStatus, setEmailSendStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
@@ -305,16 +309,13 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
 
   async function handleReplaceImage(slotKey: string, file: File) {
     try {
-      // 1. ส่งไฟล์ไปอัปโหลดบน Cloudflare R2
       const uploadedUrl = await uploadImage(file);
-
-      // 2. บันทึก URL ที่ได้ลงใน State พร้อมใส่ fileName
       setImageEdits((current) => ({
         ...current,
         [slotKey]: {
           slotKey,
           objectUrl: uploadedUrl,
-          fileName: file.name, // 👈 เพิ่มฟิลด์นี้เพื่อให้ Type สมบูรณ์
+          fileName: file.name,
           file
         }
       }));
@@ -350,6 +351,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     const namePart = getFieldValue("building_name").trim() || coverYearText || "รายงาน";
     return `รายงานตรวจสอบอาคาร-${namePart.replace(/[\\/:*?"<>|]/g, "-")}.pdf`;
   }, [coverYearText, fieldValues, selectedTemplateId]);
+  
   const renderState: ReportRenderState = useMemo(
     () => ({
       templateId: selectedTemplateId,
@@ -550,20 +552,29 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   }
 
   async function handleDownloadPdf() {
-    const pdfBytes = await createReportPdf(renderState);
-    const blobPart = new ArrayBuffer(pdfBytes.byteLength);
-    new Uint8Array(blobPart).set(pdfBytes);
-    const blob = new Blob([blobPart], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = selectedTemplateId === "maintenance-plan"
-      ? "building-maintenance-plan.pdf"
-      : `TEST-TRUE-${coverYearText}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const pdfBytes = await createReportPdf(renderState);
+      const blobPart = new ArrayBuffer(pdfBytes.byteLength);
+      new Uint8Array(blobPart).set(pdfBytes);
+      const blob = new Blob([blobPart], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = selectedTemplateId === "maintenance-plan"
+        ? "building-maintenance-plan.pdf"
+        : `TEST-TRUE-${coverYearText}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("[Download PDF failed]", error);
+      alert("เกิดข้อผิดพลาดในการสร้างไฟล์ PDF กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   }
 
   async function handleCompleteReport() {
@@ -1493,7 +1504,25 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               <Expand size={16} aria-hidden="true" />
               {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
             </button>
-            <button className="primary-action small-action" type="button" onClick={handleDownloadPdf}><FileText size={16} aria-hidden="true" />สร้าง PDF</button>
+            
+            {/* 💡 อัปเดตปุ่มสร้าง PDF ให้เปลี่ยนสถานะและแสดงข้อความโหลดเมื่อกำลังสร้าง */}
+<button 
+  className="primary-action small-action" 
+  type="button" 
+  onClick={handleDownloadPdf}
+  disabled={isGeneratingPdf}
+>
+  {isGeneratingPdf ? (
+    <>
+      <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
+      กำลังสร้าง...
+    </>
+  ) : (
+    <>
+      <FileText size={16} aria-hidden="true" />สร้าง PDF
+    </>
+  )}
+</button>
           </div>
         </div>
         <div className="preview-body">
@@ -1542,7 +1571,25 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 type="button"
               >+</button>
             </div>
-            <button className="secondary-action small-action" type="button" onClick={handleDownloadPdf}><Download size={16} aria-hidden="true" />ดาวน์โหลดร่าง</button>
+            
+            {/* 💡 อัปเดตปุ่มดาวน์โหลดร่างด้านล่างด้วยเช่นกัน */}
+            <button 
+              className="secondary-action small-action" 
+              type="button" 
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  กำลังสร้าง...
+                </>
+              ) : (
+                <>
+                  <Download size={16} aria-hidden="true" />ดาวน์โหลดร่าง
+                </>
+              )}
+            </button>
           </div>
         </div>
       </aside>
@@ -1669,14 +1716,23 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                     บันทึกไว้ก่อน / ยังไม่ส่ง
                   </button>
                   <button
-                    className="primary-action"
-                    disabled={emailSendStatus === "sending"}
-                    onClick={() => void handleSendReportEmail()}
-                    type="button"
-                  >
-                    <Send size={17} aria-hidden="true" />
-                    {emailSendStatus === "sending" ? "กำลังสร้างและส่ง PDF..." : "ส่งรายงานทางอีเมล"}
-                  </button>
+  className="primary-action"
+  disabled={emailSendStatus === "sending"}
+  onClick={() => void handleSendReportEmail()}
+  type="button"
+>
+  {emailSendStatus === "sending" ? (
+    <>
+      <Loader2 size={17} className="custom-spinner" aria-hidden="true" style={{ marginRight: "6px" }} />
+      กำลังสร้างและรายงานทางอีเมล
+    </>
+  ) : (
+    <>
+      <Send size={17} aria-hidden="true" />
+      ส่งรายงานทางอีเมล
+    </>
+  )}
+</button>
                 </div>
               </>
             )}

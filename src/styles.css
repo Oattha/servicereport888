@@ -3764,3 +3764,16 @@ td small {
   width: 100% !important;
   min-width: 0 !important;
 }
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.custom-spinner {
+  animation: spin 1s linear infinite;
+}

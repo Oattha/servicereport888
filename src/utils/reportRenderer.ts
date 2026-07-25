@@ -43,7 +43,6 @@ const CHECKLIST_TABLE_PAGES = [
 ] as const;
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 
-// --- วางต่อท้าย imageCache ---
 let cachedTemplateBytes: ArrayBuffer | null = null;
 let cachedFontBytes: ArrayBuffer | null = null;
 
@@ -757,10 +756,8 @@ async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderSt
       return;
     }
 
-    // 💡 ปรับ x เป็น 36 (ชิดซ้ายสวยพอดี) และ y เป็น 745 (ขยับขึ้นสูง ไม่ทับเส้นบรรทัด)
     page.drawRectangle({ x: 32, y: 860, width: 167, height: 38, color: rgb(1, 1, 1) });
     
-    // 💡 วางรูปโลโก้ใหม่ที่พิกัด x: 34, y: 742
     page.drawImage(headerLogo, { x: 32, y: 745.7, width: 167, height: 34 });
   });
 }
@@ -1203,9 +1200,9 @@ async function createPage18TextOverlayBytes(state: ReportRenderState) {
   );
 
   const valueSlots = [
-    { value: state.page18Text.aboveGroundFloors, x: 255, y: 190, width: 0, baseline: 199.5 }, // 👈 ลดเหลือ 198.5
-    { value: state.page18Text.basementFloors, x: 183, y: 209, width: 0, baseline: 219 },     // 👈 ลดเหลือ 217.5
-    { value: state.page18Text.accessRoadWidth, x: 207, y: 228, width: 0, baseline: 238 }    // 👈 ลดเหลือ 236.5
+    { value: state.page18Text.aboveGroundFloors, x: 255, y: 190, width: 0, baseline: 199.5 }, 
+    { value: state.page18Text.basementFloors, x: 183, y: 209, width: 0, baseline: 219 },     
+    { value: state.page18Text.accessRoadWidth, x: 207, y: 228, width: 0, baseline: 238 }    
   ];
   valueSlots.forEach((slot) => {
     erase(slot.x, slot.y, slot.width, 20);
@@ -2052,9 +2049,9 @@ async function replaceDefaultCoverBuildingPhoto(pdf: PDFDocument, state: ReportR
   xObjects.set(PDFName.of("Im0"), image.ref);
 }
 
-// 💡 ฟังก์ชัน createReportPdf พร้อมระบบ Log เช็คความสำเร็จทีละขั้นตอนและแก้ Type Error เรียบร้อยแล้ว
+
 export async function createReportPdf(state: ReportRenderState, targetPage?: number) {
-  console.log(`[PDF Generator] เริ่มต้นสร้าง PDF | Target Page: ${targetPage ?? "ทั้งหมด"}`);
+  // console.log(`[PDF Generator] เริ่มต้นสร้าง PDF | Target Page: ${targetPage ?? "ทั้งหมด"}`);
 
   if (state.templateId === "maintenance-plan") {
     try {
@@ -2062,10 +2059,10 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
         if (!response.ok) throw new Error("ไม่สามารถโหลด PDF แผนปฏิบัติการได้");
         return response.arrayBuffer();
       });
-      console.log("[PDF Generator] โหลดเทมเพลตแผนปฏิบัติการสำเร็จ");
+      // console.log("[PDF Generator] โหลดเทมเพลตแผนปฏิบัติการสำเร็จ");
       return new Uint8Array(templateBytes);
     } catch (err) {
-      console.error("[PDF Generator Error] โหลดแผนปฏิบัติการไม่สำเร็จ:", err);
+      // console.error("[PDF Generator Error] โหลดแผนปฏิบัติการไม่สำเร็จ:", err);
       throw err;
     }
   }
@@ -2074,15 +2071,15 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     const templateBytes = await getTemplateArrayBuffer();
     const pdf = await PDFDocument.load(templateBytes);
     pdf.insertPage(22, [540, 780]);
-    console.log(`[PDF Generator] โหลดเทมเพลตสำเร็จ (ทั้งหมด ${pdf.getPageCount()} หน้า)`);
+    // console.log(`[PDF Generator] โหลดเทมเพลตสำเร็จ (ทั้งหมด ${pdf.getPageCount()} หน้า)`);
 
     const executeStep = async (stepName: string, action: () => Promise<void> | void) => {
       try {
-        console.log(`[PDF Step Start] กำลังทำ: ${stepName}`);
+        // console.log(`[PDF Step Start] กำลังทำ: ${stepName}`);
         await action();
-        console.log(`[PDF Step Success] สำเร็จ: ${stepName}`);
+        // console.log(`[PDF Step Success] สำเร็จ: ${stepName}`);
       } catch (error) {
-        console.error(`[PDF Step Fail] ล้มเหลวที่: ${stepName} | สาเหตุ:`, error);
+        // console.error(`[PDF Step Fail] ล้มเหลวที่: ${stepName} | สาเหตุ:`, error);
         throw error;
       }
     };
@@ -2165,19 +2162,19 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     }
 
     if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
-      console.log(`[PDF Generator] กำลังตัดหน้าเฉพาะกิจสำหรับ Preview หน้าที่: ${targetPage}`);
+      // console.log(`[PDF Generator] กำลังตัดหน้าเฉพาะกิจสำหรับ Preview หน้าที่: ${targetPage}`);
       const previewPdf = await PDFDocument.create();
       const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
       previewPdf.addPage(copiedPage);
-      console.log(`[PDF Generator Success] สร้าง Preview หน้า ${targetPage} สำเร็จ`);
+      // console.log(`[PDF Generator Success] สร้าง Preview หน้า ${targetPage} สำเร็จ`);
       return previewPdf.save();
     }
 
-    console.log("[PDF Generator Success] สร้างไฟล์ PDF สมบูรณ์ทั้งหมดสำเร็จ");
+    // console.log("[PDF Generator Success] สร้างไฟล์ PDF สมบูรณ์ทั้งหมดสำเร็จ");
     return pdf.save();
 
   } catch (error) {
-    console.error("[PDF Generator Fatal Error] เกิดข้อผิดพลาดระหว่างสร้าง PDF:", error);
+    // console.error("[PDF Generator Fatal Error] เกิดข้อผิดพลาดระหว่างสร้าง PDF:", error);
     throw error;
   }
 }

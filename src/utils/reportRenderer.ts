@@ -1192,9 +1192,9 @@ async function createPage18TextOverlayBytes(state: ReportRenderState) {
   );
 
   const valueSlots = [
-    { value: state.page18Text.aboveGroundFloors, x: 252, y: 190, width: 16, baseline: 202.5 },
-    { value: state.page18Text.basementFloors, x: 180, y: 209, width: 14, baseline: 221.5 },
-    { value: state.page18Text.accessRoadWidth, x: 205, y: 228, width: 16, baseline: 240.5 }
+    { value: state.page18Text.aboveGroundFloors, x: 255, y: 190, width: 16, baseline: 199.5 }, // 👈 ลดเหลือ 198.5
+    { value: state.page18Text.basementFloors, x: 184, y: 209, width: 14, baseline: 219 },     // 👈 ลดเหลือ 217.5
+    { value: state.page18Text.accessRoadWidth, x: 208, y: 228, width: 16, baseline: 238 }    // 👈 ลดเหลือ 236.5
   ];
   valueSlots.forEach((slot) => {
     erase(slot.x, slot.y, slot.width, 20);

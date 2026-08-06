@@ -763,48 +763,88 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </section>
             ) : null}
 
-            {currentTemplatePage === 14 ? (
-              <section className="builder-card general-building-card">
-                <span className="page-kicker">หน้า 14</span>
-                <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
-                <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
-                <div className="form-grid">
-                  <label className="field full">
-                    <span>วันที่ใบอนุญาตก่อสร้าง</span>
-                    <input
-                      type="date"
-                      value={getFieldValue("building_permit_date")}
-                      onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
-                    />
-                  </label>
-                  <label className="field full">
-                    <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
-                    <input
-                      type="date"
-                      value={getFieldValue("controlled_use_permit_date")}
-                      onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
-                    />
-                  </label>
-                </div>
-                <div className="page14-checkbox-groups">
-                  {page14CheckboxGroups.map((group) => (
-                    <fieldset className="page14-checkbox-group" key={group.key}>
-                      <legend>{group.label}</legend>
-                      {group.options.map((option) => (
-                        <label className="page14-checkbox-option" key={option.key}>
-                          <input
-                            type="checkbox"
-                            checked={page14Checks[option.key]}
-                            onChange={() => togglePage14Check(option.key)}
-                          />
-                          <span>{option.label}</span>
-                        </label>
-                      ))}
-                    </fieldset>
-                  ))}
-                </div>
-              </section>
-            ) : null}
+{currentTemplatePage === 14 ? (
+  <section className="builder-card general-building-card">
+    <span className="page-kicker">หน้า 14</span>
+    <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
+    <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
+    <div className="form-grid">
+      {/* 💡 ช่องสำหรับใบอนุญาตก่อสร้าง (ด้านบน) */}
+      <label className="field">
+        <span>ประเภทเอกสารใบอนุญาตก่อสร้าง</span>
+        <input
+          type="text"
+          placeholder="เช่น อ.1"
+          value={getFieldValue("building_permit_type")}
+          onChange={(event) => updateFieldValue("building_permit_type", event.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>เลขที่ใบอนุญาตก่อสร้าง</span>
+        <input
+          type="text"
+          placeholder="เช่น 100/34"
+          value={getFieldValue("building_permit_number")}
+          onChange={(event) => updateFieldValue("building_permit_number", event.target.value)}
+        />
+      </label>
+      <label className="field full">
+        <span>วันที่ใบอนุญาตก่อสร้าง</span>
+        <input
+          type="date"
+          value={getFieldValue("building_permit_date")}
+          onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
+        />
+      </label>
+
+      {/* 💡 ช่องเพิ่มใหม่: สำหรับใบอนุญาตเปิดใช้/ดัดแปลงอาคาร (ตัวล่าง) */}
+      <label className="field">
+        <span>ประเภทเอกสารใบอนุญาตเปิดใช้อาคาร</span>
+        <input
+          type="text"
+          placeholder="เช่น อ.6, ภ.1"
+          value={getFieldValue("controlled_use_permit_type")}
+          onChange={(event) => updateFieldValue("controlled_use_permit_type", event.target.value)}
+        />
+      </label>
+      <label className="field">
+        <span>เลขที่ใบอนุญาตเปิดใช้อาคาร</span>
+        <input
+          type="text"
+          placeholder="เช่น 55/2561"
+          value={getFieldValue("controlled_use_permit_number")}
+          onChange={(event) => updateFieldValue("controlled_use_permit_number", event.target.value)}
+        />
+      </label>
+      <label className="field full">
+        <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
+        <input
+          type="date"
+          value={getFieldValue("controlled_use_permit_date")}
+          onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
+        />
+      </label>
+    </div>
+    
+    <div className="page14-checkbox-groups">
+      {page14CheckboxGroups.map((group) => (
+        <fieldset className="page14-checkbox-group" key={group.key}>
+          <legend>{group.label}</legend>
+          {group.options.map((option) => (
+            <label className="page14-checkbox-option" key={option.key}>
+              <input
+                type="checkbox"
+                checked={page14Checks[option.key]}
+                onChange={() => togglePage14Check(option.key)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </fieldset>
+      ))}
+    </div>
+  </section>
+) : null}
 
             {currentTemplatePage === 15 ? (
               <section className="builder-card">

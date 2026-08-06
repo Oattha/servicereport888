@@ -1832,10 +1832,20 @@ td small {
 .report-builder {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(520px, 0.95fr) minmax(560px, 1.05fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   gap: 24px;
   align-items: start;
   padding-bottom: 102px;
+  width: 100%;
+}
+
+.builder-main,
+.builder-card,
+.page23-edit-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .builder-main {
@@ -2793,17 +2803,17 @@ td small {
 .page23-result-head,
 .page23-result-row {
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) repeat(3, 64px) minmax(140px, 0.72fr);
-  gap: 8px;
+  grid-template-columns: minmax(120px, 1fr) repeat(3, 52px) minmax(100px, 0.8fr);
+  gap: 6px;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.page23-result-head {
-  padding: 0 10px;
-  color: #65758c;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
+.page23-remark-input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page23-result-head span:first-child {

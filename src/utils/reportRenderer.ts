@@ -1487,6 +1487,19 @@ function drawPage23CheckMark(
   });
 }
 
+function drawPage23DashMark(
+  page: ReturnType<PDFDocument["getPages"]>[number],
+  centerX: number,
+  centerY: number
+) {
+  page.drawLine({
+    start: { x: centerX - 5, y: centerY },
+    end: { x: centerX + 5, y: centerY },
+    thickness: 1.15,
+    color: rgb(0, 0, 0)
+  });
+}
+
 async function replacePage23Table(pdf: PDFDocument, state: ReportRenderState) {
   const page = pdf.getPages()[23];
   const tableLeft = 283.5;
@@ -1524,7 +1537,12 @@ async function replacePage23Table(pdf: PDFDocument, state: ReportRenderState) {
   page23ChecklistItems.forEach((item) => {
     const result = state.page23Results[item.key];
     if (!result) return;
-    drawPage23CheckMark(page, resultCenters[result], 780 - item.centerTop);
+    
+    if (result === "unavailable") {
+      drawPage23DashMark(page, resultCenters.unavailable, 780 - item.centerTop);
+    } else {
+      drawPage23CheckMark(page, resultCenters[result], 780 - item.centerTop);
+    }
   });
 
   const remarkBytes = await createPage23RemarkOverlayBytes(page23ChecklistItems, state.page23Remarks);
@@ -1573,7 +1591,12 @@ async function replacePage24Table(pdf: PDFDocument, state: ReportRenderState) {
   page24ChecklistItems.forEach((item) => {
     const result = state.page24Results[item.key];
     if (!result) return;
-    drawPage23CheckMark(page, resultCenters[result], 780 - item.centerTop);
+    
+    if (result === "unavailable") {
+      drawPage23DashMark(page, resultCenters.unavailable, 780 - item.centerTop);
+    } else {
+      drawPage23CheckMark(page, resultCenters[result], 780 - item.centerTop);
+    }
   });
 
   const remarkBytes = await createPage23RemarkOverlayBytes(page24ChecklistItems, state.page24Remarks);
@@ -1605,12 +1628,13 @@ function createPage25ParentheticalLine(
 ) {
   let leadingDots = "................";
   let trailingDots = "................";
-  while (context.measureText(`( ${leadingDots}${value}${trailingDots} )`).width > maxWidth * scale) {
+  
+  while (context.measureText(`( ${leadingDots} ${value} ${trailingDots} )`).width > maxWidth * scale) {
     if (trailingDots.length > leadingDots.length && trailingDots.length > 1) trailingDots = trailingDots.slice(0, -1);
     else if (leadingDots.length > 1) leadingDots = leadingDots.slice(0, -1);
     else break;
   }
-  return `( ${leadingDots}${value}${trailingDots} )`;
+  return `( ${leadingDots} ${value} ${trailingDots} )`;
 }
 
 async function createPage25TextOverlayBytes(state: ReportRenderState) {
@@ -1643,10 +1667,15 @@ async function createPage25TextOverlayBytes(state: ReportRenderState) {
     context.fillText(dateLine, 103 * scale, 429 * scale);
   }
 
+  const ownerTitle = state.page25Signatures.ownerTitle?.trim() ?? "";
   const ownerName = state.page25Signatures.ownerName.trim();
   const ownerPosition = state.page25Signatures.ownerPosition.trim();
-  if (ownerName || ownerPosition) {
-    const value = [ownerName, ownerPosition].filter(Boolean).join(" ");
+
+  // 💡 รวมคำนำหน้าและชื่อ-นามสกุล โดยเว้นวรรค 1 ช่อง
+  const fullOwnerName = [ownerTitle, ownerName].filter(Boolean).join(" ");
+
+  if (ownerTitle || ownerName || ownerPosition) {
+    const value = [fullOwnerName, ownerPosition].filter(Boolean).join(" ");
     context.fillText(createPage25ParentheticalLine(context, value, 198, scale), 105 * scale, 700 * scale);
   }
 
@@ -1723,12 +1752,18 @@ async function replacePage25Signatures(pdf: PDFDocument, state: ReportRenderStat
     state.page25Signatures.inspectorName.trim() || state.page25Signatures.inspectorNote.trim()
   );
   const hasDate = Boolean(formatPage25ThaiDate(state.page25Signatures.inspectionDate));
+  
+  // 💡 เพิ่ม ownerTitle เข้าไปในเงื่อนไขตรวจเช็กตรงนี้
   const hasOwnerText = Boolean(
-    state.page25Signatures.ownerName.trim() || state.page25Signatures.ownerPosition.trim()
+    state.page25Signatures.ownerTitle?.trim() ||
+    state.page25Signatures.ownerName.trim() ||
+    state.page25Signatures.ownerPosition.trim()
   );
+
   if (hasInspectorText) page.drawRectangle({ x: 104, y: 386, width: 214, height: 19, color: rgb(1, 1, 1) });
   if (hasDate) page.drawRectangle({ x: 101, y: 345, width: 230, height: 25, color: rgb(1, 1, 1) });
   if (hasOwnerText) page.drawRectangle({ x: 104, y: 77, width: 200, height: 20, color: rgb(1, 1, 1) });
+
   if (hasInspectorText || hasDate || hasOwnerText) {
     const overlayBytes = await createPage25TextOverlayBytes(state);
     const overlay = await pdf.embedPng(overlayBytes);
@@ -1739,6 +1774,7 @@ async function replacePage25Signatures(pdf: PDFDocument, state: ReportRenderStat
     { key: "page25_inspector_signature", x: 132, y: 414, width: 178, height: 28 },
     { key: "page25_owner_signature", x: 112, y: 105, width: 181, height: 30 }
   ] as const;
+
   for (const placement of signaturePlacements) {
     const edit = state.imageEdits[placement.key];
     if (!edit) continue;
@@ -2051,18 +2087,25 @@ async function replaceDefaultCoverBuildingPhoto(pdf: PDFDocument, state: ReportR
 
 
 export async function createReportPdf(state: ReportRenderState, targetPage?: number) {
-  // console.log(`[PDF Generator] เริ่มต้นสร้าง PDF | Target Page: ${targetPage ?? "ทั้งหมด"}`);
-
   if (state.templateId === "maintenance-plan") {
     try {
       const templateBytes = await fetch("/templates/building-maintenance-plan.pdf").then((response) => {
         if (!response.ok) throw new Error("ไม่สามารถโหลด PDF แผนปฏิบัติการได้");
         return response.arrayBuffer();
       });
-      // console.log("[PDF Generator] โหลดเทมเพลตแผนปฏิบัติการสำเร็จ");
+
+      if (targetPage) {
+        const fullPdf = await PDFDocument.load(templateBytes);
+        if (targetPage >= 1 && targetPage <= fullPdf.getPageCount()) {
+          const previewPdf = await PDFDocument.create();
+          const [copiedPage] = await previewPdf.copyPages(fullPdf, [targetPage - 1]);
+          previewPdf.addPage(copiedPage);
+          return previewPdf.save();
+        }
+      }
+
       return new Uint8Array(templateBytes);
     } catch (err) {
-      // console.error("[PDF Generator Error] โหลดแผนปฏิบัติการไม่สำเร็จ:", err);
       throw err;
     }
   }

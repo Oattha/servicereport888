@@ -1,3 +1,5 @@
+// src/types.ts
+
 import type { InspectionFrequency } from "./data/inspectionChecklist";
 import type { MaintenancePlanPage7Checks } from "./data/maintenancePlanPage7";
 import type { MaintenancePlanPage8Checks } from "./data/maintenancePlanPage8";
@@ -197,6 +199,7 @@ export type Page25SignatureState = {
   inspectorName: string;
   inspectorNote: string;
   inspectionDate: string;
+  ownerTitle?: string; // 👈 เพิ่มฟิลด์นี้รองรับคำนำหน้า
   ownerName: string;
   ownerPosition: string;
 };

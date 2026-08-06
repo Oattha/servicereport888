@@ -150,7 +150,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [completeSaveStatus, setCompleteSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [completedReportId, setCompletedReportId] = useState<string | null>(null);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
-  
+
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const [recipientEmail, setRecipientEmail] = useState(initialState?.fieldValues.customer_email ?? "");
@@ -351,7 +351,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     const namePart = getFieldValue("building_name").trim() || coverYearText || "รายงาน";
     return `รายงานตรวจสอบอาคาร-${namePart.replace(/[\\/:*?"<>|]/g, "-")}.pdf`;
   }, [coverYearText, fieldValues, selectedTemplateId]);
-  
+
   const renderState: ReportRenderState = useMemo(
     () => ({
       templateId: selectedTemplateId,
@@ -899,12 +899,19 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                           <input
                             type="checkbox"
                             checked={page18Checks[option.key]}
-                            onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
+                            onChange={() => {
+                              const nextState = !page18Checks[option.key];
+                              setPage18Checks((current) => ({ ...current, [option.key]: nextState }));
+                              if (!nextState) {
+                                updatePage18Text(field as keyof Page18TextState, "");
+                              }
+                            }}
                           />
                           <span>{option.label}</span>
                         </label>
                         <input
                           aria-label={option.label}
+                          disabled={!page18Checks[option.key]}
                           maxLength={20}
                           value={page18Text[field as keyof Page18TextState]}
                           onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
@@ -912,19 +919,24 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                         <span>{suffix}</span>
                       </div>
                     ))}
+
                     <div className="page18-inline-row page18-other-row">
                       <label className="page18-checkbox-option">
                         <input
                           type="checkbox"
                           checked={page18Checks.has_other_building_info}
-                          onChange={() => setPage18Checks((current) => ({
-                            ...current,
-                            has_other_building_info: !current.has_other_building_info
-                          }))}
+                          onChange={() => {
+                            const nextState = !page18Checks.has_other_building_info;
+                            setPage18Checks((current) => ({ ...current, has_other_building_info: nextState }));
+                            if (!nextState) {
+                              updatePage18Text("otherBuildingInfo", "");
+                            }
+                          }}
                         />
                         <span>อื่น ๆ (ระบุ)</span>
                       </label>
                       <textarea
+                        disabled={!page18Checks.has_other_building_info}
                         maxLength={300}
                         rows={3}
                         value={page18Text.otherBuildingInfo}
@@ -945,11 +957,18 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                         <input
                           type="checkbox"
                           checked={page18Checks[option.key]}
-                          onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
+                          onChange={() => {
+                            const nextState = !page18Checks[option.key];
+                            setPage18Checks((current) => ({ ...current, [option.key]: nextState }));
+                            if (!nextState) {
+                              updatePage18Text(field as keyof Page18TextState, "");
+                            }
+                          }}
                         />
                         <span>{option.label}</span>
                       </label>
                       <input
+                        disabled={!page18Checks[option.key]}
                         maxLength={100}
                         value={page18Text[field as keyof Page18TextState]}
                         onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
@@ -969,15 +988,22 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                         <input
                           type="checkbox"
                           checked={page18Checks[row.checkboxKey]}
-                          onChange={() => setPage18Checks((current) => ({
-                            ...current,
-                            [row.checkboxKey]: !current[row.checkboxKey]
-                          }))}
+                          onChange={() => {
+                            const nextState = !page18Checks[row.checkboxKey];
+                            setPage18Checks((current) => ({ ...current, [row.checkboxKey]: nextState }));
+                            if (!nextState) {
+                              setPage18Materials((current) => ({
+                                ...current,
+                                [row.key]: { type: "", quantity: "", storage: "" }
+                              }));
+                            }
+                          }}
                         />
                         <span>{row.label}</span>
                       </label>
                       {(["type", "quantity", "storage"] as const).map((field) => (
                         <input
+                          disabled={!page18Checks[row.checkboxKey]}
                           aria-label={`${row.label} ${field}`}
                           key={field}
                           maxLength={60}
@@ -987,19 +1013,24 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                       ))}
                     </div>
                   ))}
+
                   <div className="page18-inline-row page18-other-row">
                     <label className="page18-checkbox-option">
                       <input
                         type="checkbox"
                         checked={page18Checks.stores_other_material}
-                        onChange={() => setPage18Checks((current) => ({
-                          ...current,
-                          stores_other_material: !current.stores_other_material
-                        }))}
+                        onChange={() => {
+                          const nextState = !page18Checks.stores_other_material;
+                          setPage18Checks((current) => ({ ...current, stores_other_material: nextState }));
+                          if (!nextState) {
+                            updatePage18Text("otherMaterial", "");
+                          }
+                        }}
                       />
                       <span>อื่น ๆ (ระบุ)</span>
                     </label>
                     <input
+                      disabled={!page18Checks.stores_other_material}
                       maxLength={150}
                       value={page18Text.otherMaterial}
                       onChange={(event) => updatePage18Text("otherMaterial", event.target.value)}
@@ -1010,75 +1041,93 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
             ) : null}
 
             {currentTemplatePage === 26 ? (
-              <section className="builder-card page25-edit-card">
-                <span className="page-kicker">หน้า 26</span>
-                <h2>ลายเซ็นและวันที่</h2>
-                <p>หากเว้นว่าง ระบบจะคงข้อความเดิมจาก Template ไว้</p>
+  <section className="builder-card page25-edit-card">
+    <span className="page-kicker">หน้า 26</span>
+    <h2>ลายเซ็นและวันที่</h2>
+    <p>หากเว้นว่าง ระบบจะคงข้อความเดิมจาก Template ไว้</p>
 
-                <fieldset className="page25-signature-section">
-                  <legend>ผู้ตรวจสอบอาคาร</legend>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>ชื่อผู้ตรวจสอบ</span>
-                      <input
-                        maxLength={80}
-                        placeholder="ใช้ชื่อเดิมจาก Template"
-                        value={page25Signatures.inspectorName}
-                        onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
-                      <input
-                        maxLength={80}
-                        value={page25Signatures.inspectorNote}
-                        onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>วันที่ลงนาม</span>
-                      <input
-                        type="date"
-                        value={page25Signatures.inspectionDate}
-                        onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <ImageSlot
-                    edit={imageEdits.page25_inspector_signature}
-                    onReplace={handleReplaceImage}
-                    slot={page25SignatureSlots[0]}
-                  />
-                </fieldset>
+    <fieldset className="page25-signature-section">
+      <legend>ผู้ตรวจสอบอาคาร</legend>
+      <div className="form-grid">
+        <label className="field">
+          <span>ชื่อผู้ตรวจสอบ</span>
+          <input
+            maxLength={80}
+            placeholder="ใช้ชื่อเดิมจาก Template"
+            value={page25Signatures.inspectorName}
+            onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
+          <input
+            maxLength={80}
+            value={page25Signatures.inspectorNote}
+            onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>วันที่ลงนาม</span>
+          <input
+            type="date"
+            value={page25Signatures.inspectionDate}
+            onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
+          />
+        </label>
+      </div>
 
-                <fieldset className="page25-signature-section">
-                  <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>ชื่อ</span>
-                      <input
-                        maxLength={80}
-                        value={page25Signatures.ownerName}
-                        onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
-                      />
-                    </label>
-                    <label className="field">
-                      <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
-                      <input
-                        maxLength={80}
-                        value={page25Signatures.ownerPosition}
-                        onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
-                      />
-                    </label>
-                  </div>
-                  <ImageSlot
-                    edit={imageEdits.page25_owner_signature}
-                    onReplace={handleReplaceImage}
-                    slot={page25SignatureSlots[1]}
-                  />
-                </fieldset>
-              </section>
-            ) : null}
+      {/* 💡 ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราวตามที่ลูกค้าแจ้ง */}
+      {/* 
+      <ImageSlot
+        edit={imageEdits.page25_inspector_signature}
+        onReplace={handleReplaceImage}
+        slot={page25SignatureSlots[0]}
+      /> 
+      */}
+    </fieldset>
+
+    <fieldset className="page25-signature-section">
+      <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
+      <div className="form-grid">
+        {/* 💡 เพิ่มช่องคำนำหน้าชื่อ */}
+        <label className="field">
+          <span>คำนำหน้า</span>
+          <input
+            maxLength={30}
+            placeholder="นาย / นาง / นางสาว / บริษัท"
+            value={page25Signatures.ownerTitle ?? ""}
+            onChange={(event) => updatePage25SignatureField("ownerTitle", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>ชื่อ-นามสกุล</span>
+          <input
+            maxLength={80}
+            value={page25Signatures.ownerName}
+            onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
+          <input
+            maxLength={80}
+            value={page25Signatures.ownerPosition}
+            onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
+          />
+        </label>
+      </div>
+
+      {/* 💡 ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
+      {/* 
+      <ImageSlot
+        edit={imageEdits.page25_owner_signature}
+        onReplace={handleReplaceImage}
+        slot={page25SignatureSlots[1]}
+      /> 
+      */}
+    </fieldset>
+  </section>
+) : null}
 
             {currentTemplatePage === 24 ? (
               <section className="builder-card page23-edit-card">
@@ -1504,33 +1553,33 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               <Expand size={16} aria-hidden="true" />
               {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
             </button>
-            
+
             {/* 💡 อัปเดตปุ่มสร้าง PDF ให้เปลี่ยนสถานะและแสดงข้อความโหลดเมื่อกำลังสร้าง */}
-<button 
-  className="primary-action small-action" 
-  type="button" 
-  onClick={handleDownloadPdf}
-  disabled={isGeneratingPdf}
->
-  {isGeneratingPdf ? (
-    <>
-      <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
-      กำลังสร้าง...
-    </>
-  ) : (
-    <>
-      <FileText size={16} aria-hidden="true" />สร้าง PDF
-    </>
-  )}
-</button>
+            <button
+              className="primary-action small-action"
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+            >
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
+                  กำลังสร้าง...
+                </>
+              ) : (
+                <>
+                  <FileText size={16} aria-hidden="true" />สร้าง PDF
+                </>
+              )}
+            </button>
           </div>
         </div>
         <div className="preview-body">
           <div className="pdf-page pdf-template-page">
             <div className="pdf-template-canvas" data-existing-year-edit={coverYearText}>
               {selectedTemplateId === "annual-inspection" && (currentTemplatePage === 14 || currentTemplatePage === 15)
-  ? null
-  : <div className="locked-overlay">LOCKED TEMPLATE</div>}
+                ? null
+                : <div className="locked-overlay">LOCKED TEMPLATE</div>}
               <ReportPdfPreview
                 page={currentTemplatePage}
                 renderState={renderState}
@@ -1571,11 +1620,11 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 type="button"
               >+</button>
             </div>
-            
+
             {/* 💡 อัปเดตปุ่มดาวน์โหลดร่างด้านล่างด้วยเช่นกัน */}
-            <button 
-              className="secondary-action small-action" 
-              type="button" 
+            <button
+              className="secondary-action small-action"
+              type="button"
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf}
             >
@@ -1716,23 +1765,23 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                     บันทึกไว้ก่อน / ยังไม่ส่ง
                   </button>
                   <button
-  className="primary-action"
-  disabled={emailSendStatus === "sending"}
-  onClick={() => void handleSendReportEmail()}
-  type="button"
->
-  {emailSendStatus === "sending" ? (
-    <>
-      <Loader2 size={17} className="custom-spinner" aria-hidden="true" style={{ marginRight: "6px" }} />
-      กำลังสร้างและรายงานทางอีเมล
-    </>
-  ) : (
-    <>
-      <Send size={17} aria-hidden="true" />
-      ส่งรายงานทางอีเมล
-    </>
-  )}
-</button>
+                    className="primary-action"
+                    disabled={emailSendStatus === "sending"}
+                    onClick={() => void handleSendReportEmail()}
+                    type="button"
+                  >
+                    {emailSendStatus === "sending" ? (
+                      <>
+                        <Loader2 size={17} className="custom-spinner" aria-hidden="true" style={{ marginRight: "6px" }} />
+                        กำลังสร้างและรายงานทางอีเมล
+                      </>
+                    ) : (
+                      <>
+                        <Send size={17} aria-hidden="true" />
+                        ส่งรายงานทางอีเมล
+                      </>
+                    )}
+                  </button>
                 </div>
               </>
             )}

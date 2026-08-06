@@ -76,7 +76,8 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
         }
         const pdfDocument = await pdfDocumentCacheRef.current.promise;
         if (!isCurrent) return;
-        const pdfPage = await pdfDocument.getPage(1);
+        const pageToRender = pdfDocument.numPages === 1 ? 1 : page;
+        const pdfPage = await pdfDocument.getPage(pageToRender);
         const canvas = canvasRef.current;
         if (!canvas || !isCurrent) return;
         const context = canvas.getContext("2d");

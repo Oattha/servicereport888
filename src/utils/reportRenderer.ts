@@ -267,7 +267,7 @@ function replacePage14CheckboxGlyphs(
     updatedContent = updatedContent.replace(
       markedContentPattern,
       (_match, start: string, body: string, end: string) => {
-        // 💡 รหัสกล่องเปล่าคือ 0085 และรหัสเครื่องหมายถูกตามไฟล์ต้นฉบับคือ 0035
+
         const glyph = checks[option.key] ? "0035" : "0085";
         const nextBody = body.replace(
           /(\/C2_1\s+1\s+Tf[\s\S]*?<)(?:0035|0085)(>\s*Tj)/,
@@ -922,7 +922,6 @@ async function createPage14PermitTextImageBytes(state: ReportRenderState) {
     ? `${permitDate.day} เดือน ${permitDate.month} พ.ศ. ${permitDate.buddhistYear}`
     : "- เดือน - พ.ศ. -";
 
-  // รวมประเภทเอกสารและเลขที่เข้าด้วยกันอย่างถูกต้อง
   let permitNoText = "";
   if (permitType && permitNumber) {
     permitNoText = `${permitType} เลขที่ ${permitNumber} `;
@@ -936,7 +935,7 @@ async function createPage14PermitTextImageBytes(state: ReportRenderState) {
 
   const scale = 4;
   const pdfWidth = 464;
-  const pdfHeight = 25; // ใช้ความสูงมาตรฐานบรรทัดเดียว ไม่ทับข้อความอื่น
+  const pdfHeight = 26; // ใช้ความสูงมาตรฐานบรรทัดเดียว ไม่ทับข้อความอื่น
   const canvas = document.createElement("canvas");
   canvas.width = pdfWidth * scale;
   canvas.height = pdfHeight * scale;
@@ -953,7 +952,6 @@ async function createPage14PermitTextImageBytes(state: ReportRenderState) {
   context.textBaseline = "alphabetic";
   context.textRendering = "geometricPrecision";
 
-  // ปรับขนาดฟอนต์อัตโนมัติหากข้อความยาวเกินบรรทัด
   let fontSize = 15.96;
   context.font = `${fontSize * scale}px "Page14PermitCordiaNew"`;
   const maxWidth = 460 * scale;
@@ -962,7 +960,7 @@ async function createPage14PermitTextImageBytes(state: ReportRenderState) {
     context.font = `${fontSize * scale}px "Page14PermitCordiaNew"`;
   }
 
-  context.fillText(permitText, 1.42 * scale, 10.33 * scale);
+  context.fillText(permitText, 1.42 * scale, 18 * scale);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((nextBlob) => {
@@ -979,7 +977,6 @@ async function replacePage14PermitText(pdf: PDFDocument, state: ReportRenderStat
   const overlayBytes = await createPage14PermitTextImageBytes(state);
   const overlay = await pdf.embedPng(overlayBytes);
   
-  // ใช้พิกัดเดิมเพื่อความแม่นยำ
   page.drawImage(overlay, { x: 38, y: 414, width: 464, height: 25 });
 }
 
@@ -1003,12 +1000,11 @@ async function createPage14ControlledUseDateImageBytes(state: ReportRenderState)
 
   const line1 = `เป็นอาคารประเภทควบคุมการใช้ อาคารเคยมีการดัดแปลงและได้รับใบอนุญาตเปิดใช้อาคาร`;
   const line2 = `${permitNoText}จากเจ้าพนักงานท้องถิ่น เมื่อวันที่ ${dateText}`;
-  // 💡 สร้างข้อความบรรทัดล่างสุดเตรียมไว้เพื่อวาดใหม่ในพิกัดที่ต่ำลงมา
   const line3NotControlled = `ไม่เป็นอาคารประเภทควบคุมการใช้`;
 
   const scale = 4;
   const pdfWidth = 464;
-  const pdfHeight = 55; // 💡 ขยายความสูงแคนวาสครอบคลุมถึงบรรทัดล่างสุดที่ขยับลงมา
+  const pdfHeight = 53;
   const canvas = document.createElement("canvas");
   canvas.width = pdfWidth * scale;
   canvas.height = pdfHeight * scale;
@@ -1019,21 +1015,17 @@ async function createPage14ControlledUseDateImageBytes(state: ReportRenderState)
   await dateFont.load();
   document.fonts.add(dateFont);
 
-  // วาดพื้นหลังขาวลบข้อความเดิมทั้งหมด
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   
   context.fillStyle = "#000000";
   context.textBaseline = "alphabetic";
   context.textRendering = "geometricPrecision";
+  
   context.font = `${15.96 * scale}px "Page14ControlledUseCordiaNew"`;
 
-  // บรรทัดที่ 1
   context.fillText(line1, 0, 11 * scale);
-  // บรรทัดที่ 2 (ดันข้อความจากเจ้าพนักงานท้องถิ่น...)
   context.fillText(line2, 0, (11 + 17) * scale);
-  
-  // 💡 บรรทัดที่ 3: วาดตัวหนังสือ "ไม่เป็นอาคารประเภทควบคุมการใช้" ขยับต่ำลงมาจากบรรทัด 2 อีก 18px
   context.fillText(line3NotControlled, 0, (11 + 17 + 18) * scale);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -1048,7 +1040,6 @@ async function createPage14ControlledUseDateImageBytes(state: ReportRenderState)
 async function replacePage14ControlledUseDate(pdf: PDFDocument, state: ReportRenderState) {
   const page = pdf.getPages()[13];
 
-  // 1. วาดกล่องสีขาวเคลียร์พื้นที่เดิมบรรทัดเปิดใช้อาคารและเช็กบ็อกซ์ล่างสุด
   page.drawRectangle({
     x: 35,
     y: 118,
@@ -1057,11 +1048,9 @@ async function replacePage14ControlledUseDate(pdf: PDFDocument, state: ReportRen
     color: rgb(1, 1, 1)
   });
 
-  // 2. วาดเฉพาะกล่องเช็กบ็อกซ์เปล่า [ ] ตัวล่างสุดขึ้นมาใหม่ (ขยับ Y ขึ้นเป็น 122)
-  // 💡 เอา page.drawText("5", ...) ออกทั้งหมดแล้ว เพื่อไม่ให้มีเลข 5 ซ้อน
   page.drawRectangle({
-    x: 46.2,
-    y: 140,
+    x: 46.2, 
+    y: 140,  
     width: 11,
     height: 11,
     borderColor: rgb(0, 0, 0),
@@ -1069,7 +1058,6 @@ async function replacePage14ControlledUseDate(pdf: PDFDocument, state: ReportRen
     color: rgb(1, 1, 1)
   });
 
-  // 💡 หากมีการติ๊ก "ไม่เป็นอาคารประเภทควบคุมการใช้" ให้วาดเครื่องหมายถูก ✓ ลงในกล่องสี่เหลี่ยมพิกัดใหม่
   const isNotControlledChecked = state.page14Checks.is_not_controlled_use_building;
   if (isNotControlledChecked) {
     page.drawLine({
@@ -1086,10 +1074,15 @@ async function replacePage14ControlledUseDate(pdf: PDFDocument, state: ReportRen
     });
   }
 
-  // 3. วาดภาพข้อความทั้ง 3 บรรทัด
   const overlayBytes = await createPage14ControlledUseDateImageBytes(state);
   const overlay = await pdf.embedPng(overlayBytes);
-  page.drawImage(overlay, { x: 61.5, y: 131.7, width: 455, height: 54 });
+  
+  page.drawImage(overlay, { 
+    x: 61.5, 
+    y: 132.7, 
+    width: 455, 
+    height: 54 
+  });
 }
 
 async function createPage17PartyImageBytes(
@@ -1754,7 +1747,6 @@ async function createPage25TextOverlayBytes(state: ReportRenderState) {
   const ownerName = state.page25Signatures.ownerName.trim();
   const ownerPosition = state.page25Signatures.ownerPosition.trim();
 
-  // 💡 รวมคำนำหน้าและชื่อ-นามสกุล โดยเว้นวรรค 1 ช่อง
   const fullOwnerName = [ownerTitle, ownerName].filter(Boolean).join(" ");
 
   if (ownerTitle || ownerName || ownerPosition) {
@@ -1836,7 +1828,6 @@ async function replacePage25Signatures(pdf: PDFDocument, state: ReportRenderStat
   );
   const hasDate = Boolean(formatPage25ThaiDate(state.page25Signatures.inspectionDate));
   
-  // 💡 เพิ่ม ownerTitle เข้าไปในเงื่อนไขตรวจเช็กตรงนี้
   const hasOwnerText = Boolean(
     state.page25Signatures.ownerTitle?.trim() ||
     state.page25Signatures.ownerName.trim() ||
@@ -1883,7 +1874,11 @@ async function replaceCoverText(pdf: PDFDocument, state: ReportRenderState) {
   const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
   const ownerCompany = getFieldValue(state, "owner_company");
   const buildingName = getFieldValue(state, "building_name");
-  const buildingDescription = getFieldValue(state, "building_description");
+  
+  const isControlledUse = state.page14Checks.is_controlled_use_building;
+  const buildingDescription = isControlledUse 
+    ? "อาคารประเภทควบคุมการใช้" 
+    : getFieldValue(state, "building_description");
 
   drawCenteredText(page, thaiFont, `${ownerCompany} (${buildingName})`, 270, 111, 470, 22);
   drawCenteredText(page, thaiFont, buildingDescription, 270, 72, 420, 20);
@@ -2007,7 +2002,6 @@ async function redrawPage13ChecklistText(pdf: PDFDocument) {
   appendPageContentStream(page, `q\n207 0 0 574 79.2 101 cm\n/${imageNameText} Do\nQ\n`);
 }
 
-// แทนที่ฟังก์ชัน createGeneralBuildingInfoImageBytes เดิมด้วยโค้ดนี้
 async function createGeneralBuildingInfoImageBytes(state: ReportRenderState) {
   const ownerCompany = getFieldValue(state, "owner_company");
   const buildingName = getFieldValue(state, "building_name");
@@ -2037,13 +2031,11 @@ async function createGeneralBuildingInfoImageBytes(state: ReportRenderState) {
   const firstBaselineY = 11.53 * scale;
   const lineHeight = 19.2 * scale;
 
-  // 💡 แยกการตัดคำของชื่ออาคาร และบังคับให้ "อาคารเคยมีการ..." ขึ้นบรรทัดใหม่ทันทีตามที่ต้องการ
   const buildingText = `ชื่ออาคาร ${ownerCompany} (${buildingName})`;
   const buildingLines = wrapCanvasTextLines(context, buildingText, maxWidth);
   
   const addressLines = wrapCanvasTextLines(context, buildingAddress, maxWidth);
 
-  // รวมบรรทัดทั้งหมดโดยให้ที่อยู่ขึ้นบรรทัดใหม่ถัดจากชื่ออาคาร
   const lines = [...buildingLines, ...addressLines];
 
   if (lines.length > 4) {

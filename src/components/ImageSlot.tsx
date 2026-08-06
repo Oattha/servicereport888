@@ -50,7 +50,7 @@ export function ImageSlot({ slot, edit, onReplace, hasDefaultImage = true }: Ima
       <label className="upload-button replace-button">
         <RefreshCw size={16} aria-hidden="true" />
         เปลี่ยนรูป
-        <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onChange={handleChange} />
+        <input type="file" accept="image/*" onChange={handleChange} />
       </label>
       {errorMessage ? <p className="form-error" role="alert">{errorMessage}</p> : null}
     </article>

@@ -115,6 +115,14 @@ const defaultMapLocation: MapLocationValue = {
   address: ""
 };
 
+function getCurrentDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getTemplatePageImage(templateId: ReportTemplateId, page: number) {
   const template = getReportTemplate(templateId);
   const sourcePage = templateId === "annual-inspection" && page === 23
@@ -165,10 +173,14 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [imageRevision, setImageRevision] = useState(0);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     ...defaultTemplateFieldValues,
+    building_permit_date: initialState?.fieldValues?.building_permit_date || getCurrentDateString(),
+    controlled_use_permit_date: initialState?.fieldValues?.controlled_use_permit_date || getCurrentDateString(),
     ...initialState?.fieldValues
   });
+
   const [mapLocation, setMapLocation] = useState<MapLocationValue>({
     ...defaultMapLocation,
     ...initialState?.mapLocation
@@ -232,10 +244,13 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [page23Remarks, setPage23Remarks] = useState({ ...defaultPage23Remarks, ...initialState?.page23Remarks });
   const [page24Results, setPage24Results] = useState({ ...defaultPage24Results, ...initialState?.page24Results });
   const [page24Remarks, setPage24Remarks] = useState({ ...defaultPage24Remarks, ...initialState?.page24Remarks });
+  
   const [page25Signatures, setPage25Signatures] = useState({
     ...defaultPage25Signatures,
+    inspectionDate: initialState?.page25Signatures?.inspectionDate || getCurrentDateString(),
     ...initialState?.page25Signatures
   });
+
   const imageEditsRef = useRef(imageEdits);
   imageEditsRef.current = imageEdits;
 
@@ -769,7 +784,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
     <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
     <div className="form-grid">
-      {/* 💡 ช่องสำหรับใบอนุญาตก่อสร้าง (ด้านบน) */}
+
       <label className="field">
         <span>ประเภทเอกสารใบอนุญาตก่อสร้าง</span>
         <input
@@ -797,7 +812,6 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         />
       </label>
 
-      {/* 💡 ช่องเพิ่มใหม่: สำหรับใบอนุญาตเปิดใช้/ดัดแปลงอาคาร (ตัวล่าง) */}
       <label className="field">
         <span>ประเภทเอกสารใบอนุญาตเปิดใช้อาคาร</span>
         <input
@@ -1116,7 +1130,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         </label>
       </div>
 
-      {/* 💡 ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราวตามที่ลูกค้าแจ้ง */}
+      {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
       {/* 
       <ImageSlot
         edit={imageEdits.page25_inspector_signature}
@@ -1129,7 +1143,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     <fieldset className="page25-signature-section">
       <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
       <div className="form-grid">
-        {/* 💡 เพิ่มช่องคำนำหน้าชื่อ */}
+
         <label className="field">
           <span>คำนำหน้า</span>
           <input
@@ -1157,7 +1171,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         </label>
       </div>
 
-      {/* 💡 ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
+      {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
       {/* 
       <ImageSlot
         edit={imageEdits.page25_owner_signature}
@@ -1594,7 +1608,6 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
             </button>
 
-            {/* 💡 อัปเดตปุ่มสร้าง PDF ให้เปลี่ยนสถานะและแสดงข้อความโหลดเมื่อกำลังสร้าง */}
             <button
               className="primary-action small-action"
               type="button"
@@ -1661,7 +1674,6 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               >+</button>
             </div>
 
-            {/* 💡 อัปเดตปุ่มดาวน์โหลดร่างด้านล่างด้วยเช่นกัน */}
             <button
               className="secondary-action small-action"
               type="button"

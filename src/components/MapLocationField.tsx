@@ -103,7 +103,7 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
         setErrorMessage("ไม่สามารถอ่านไฟล์รูปภาพได้");
       }
     },
-    [onChange, value]
+    [onChange]
   );
 
   const { getInputProps, getRootProps, isDragActive } = useDropzone({

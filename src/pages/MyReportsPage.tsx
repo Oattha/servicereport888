@@ -1,6 +1,7 @@
 import { Edit3, FilePlus2, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
+import { LoadingSpinner, SkeletonTable } from "../components/LoadingSpinner";
 import { getReportDrafts } from "../lib/reportDrafts";
 import type { ReportDraft } from "../types";
 
@@ -68,7 +69,7 @@ export function MyReportsPage({ onCreateReport, onEditDraft }: MyReportsPageProp
           </div>
         </div>
         {error ? <div className="empty-state">{error}</div> : null}
-        {!error && isLoading ? <div className="empty-state">กำลังโหลดรายงาน...</div> : null}
+        {!error && isLoading ? <LoadingSpinner /> : null}
         {!error && !isLoading && drafts.length === 0 ? (
           <div className="empty-state empty-panel">ยังไม่มีรายงานที่บันทึกชั่วคราว</div>
         ) : null}

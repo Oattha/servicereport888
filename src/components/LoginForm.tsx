@@ -19,6 +19,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return; // ป้องกันการกดซ้ำซ้อน (Double submission)
     setError("");
 
     if (!email.trim() || !password) {

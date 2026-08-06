@@ -150,6 +150,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [completedReportId, setCompletedReportId] = useState<string | null>(null);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState(initialState?.fieldValues.customer_email ?? "");
+  const [ccEmail, setCcEmail] = useState("");
   const [emailSendStatus, setEmailSendStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [emailError, setEmailError] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<ReportTemplateId>(
@@ -324,7 +325,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   }
 
   const coverYearText = getFieldValue("cover_year");
-  const coverYearSuffix = coverYearText.replace(/\D/g, "").slice(-2);
+  const coverYearSuffix = coverYearText.startsWith("25")
+    ? coverYearText.slice(2)
+    : coverYearText.replace(/\D/g, "").slice(0, 2);
   const page17CoverDefaults = useMemo(() => getPage17CoverDefaults(fieldValues), [fieldValues]);
   const pdfFileName = useMemo(() => {
     if (selectedTemplateId === "maintenance-plan") return "แผนปฏิบัติการตรวจบำรุงรักษาอาคาร.pdf";
@@ -591,8 +594,15 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   async function handleSendReportEmail() {
     if (!completedReportId || emailSendStatus === "sending") return;
     const normalizedEmail = recipientEmail.trim();
+    const normalizedCc = ccEmail.trim();
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setEmailError("กรุณากรอกอีเมลผู้รับให้ถูกต้อง");
+      return;
+    }
+
+    if (normalizedCc && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedCc)) {
+      setEmailError("กรุณากรอกอีเมล CC ให้ถูกต้อง");
       return;
     }
 
@@ -603,6 +613,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       const pdfBase64 = await pdfBytesToBase64(pdfBytes);
       await sendReportEmail(completedReportId, {
         recipientEmail: normalizedEmail,
+        ccEmail: normalizedCc || undefined,
         fileName: pdfFileName,
         pdfBase64
       });
@@ -666,561 +677,561 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         </section>
 
         {selectedTemplate.editable ? (
-        <>
-        {currentTemplatePage === 1 ? (
-        <section className="builder-card cover-edit-card">
-          <h2>แก้ข้อมูลหน้าแรกของเทมเพลต</h2>
-          <div className="form-grid">
-            <label className="field">
-              <span>ปีรายงาน</span>
-              <div className="year-input">
-                <strong>25</strong>
-                <input
-                  maxLength={2}
-                  value={coverYearSuffix}
-                  onChange={(event) => {
-                    const value = event.target.value.replace(/\D/g, "").slice(0, 2);
-                    updateFieldValue("cover_year", `25${value}`);
-                  }}
-                  placeholder="__"
-                />
-              </div>
-            </label>
-            <label className="field full">
-              <span>ชื่อบริษัทด้านล่างหน้าปก</span>
-              <input
-                value={getFieldValue("owner_company")}
-                onChange={(event) => updateFieldValue("owner_company", event.target.value)}
-              />
-            </label>
-            <label className="field full">
-              <span>อีเมลลูกค้า (สำหรับส่งรายงาน)</span>
-              <input
-                type="email"
-                value={getFieldValue("customer_email")}
-                onChange={(event) => updateFieldValue("customer_email", event.target.value)}
-                placeholder="customer@example.com"
-              />
-            </label>
-            {currentPageTextFields
-              .filter(
-                (field) =>
-                  field.key !== "cover_year" &&
-                  field.key !== "owner_company"
-              )
-              .map((field) => {
-                const valueKey = field.sourceKey ?? field.key;
-                return (
-                  <label className="field full" key={field.key}>
-                    <span>{field.label}</span>
-                    <input
-                      type={field.type === "date" ? "date" : field.type === "time" ? "time" : "text"}
-                      value={getFieldValue(valueKey)}
-                      onChange={(event) => updateFieldValue(valueKey, event.target.value)}
-                    />
-                  </label>
-                );
-              })}
-          </div>
-        </section>
-        ) : null}
-
-        {currentTemplatePage === 14 ? (
-          <section className="builder-card general-building-card">
-            <span className="page-kicker">หน้า 14</span>
-            <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
-            <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
-            <div className="form-grid">
-              <label className="field full">
-                <span>วันที่ใบอนุญาตก่อสร้าง</span>
-                <input
-                  type="date"
-                  value={getFieldValue("building_permit_date")}
-                  onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
-                />
-              </label>
-              <label className="field full">
-                <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
-                <input
-                  type="date"
-                  value={getFieldValue("controlled_use_permit_date")}
-                  onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
-                />
-              </label>
-            </div>
-            <div className="page14-checkbox-groups">
-              {page14CheckboxGroups.map((group) => (
-                <fieldset className="page14-checkbox-group" key={group.key}>
-                  <legend>{group.label}</legend>
-                  {group.options.map((option) => (
-                    <label className="page14-checkbox-option" key={option.key}>
+          <>
+            {currentTemplatePage === 1 ? (
+              <section className="builder-card cover-edit-card">
+                <h2>แก้ข้อมูลหน้าแรกของเทมเพลต</h2>
+                <div className="form-grid">
+                  <label className="field">
+                    <span>ปีรายงาน</span>
+                    <div className="year-input">
+                      <strong>25</strong>
                       <input
-                        type="checkbox"
-                        checked={page14Checks[option.key]}
-                        onChange={() => togglePage14Check(option.key)}
+                        maxLength={2}
+                        value={coverYearSuffix}
+                        onChange={(event) => {
+                          const val = event.target.value.replace(/\D/g, "").slice(0, 2);
+                          updateFieldValue("cover_year", val ? `25${val}` : "25");
+                        }}
+                        placeholder="__"
                       />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </fieldset>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 15 ? (
-          <section className="builder-card">
-            <MapLocationField value={mapLocation} onChange={updateMapLocation} />
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 17 ? (
-          <section className="builder-card page17-edit-card">
-            <span className="page-kicker">หน้า 17</span>
-            <h2>เจ้าของ ผู้ครอบครอง และประเภทอาคาร</h2>
-            <p>ข้อมูลที่ยังไม่ได้แก้จะดึงจากหน้า 1 อัตโนมัติ การแก้ไขส่วนนี้มีผลเฉพาะหน้า 17</p>
-            <div className="page17-party-sections">
-              {[
-                { key: "owner", title: "2.1 เจ้าของอาคาร", values: page17Owner, setter: setPage17Owner },
-                { key: "occupant", title: "2.2 ผู้ครอบครองอาคาร", values: page17Occupant, setter: setPage17Occupant }
-              ].map((party) => (
-                <fieldset className="page17-party-section" key={party.key}>
-                  <legend>{party.title}</legend>
-                  <div className="form-grid">
-                    {page17PartyFields.map((field) => (
-                      <label className="field" key={field.key}>
-                        <span>{field.label}</span>
-                        <input
-                          maxLength={field.maxLength}
-                          value={party.values[field.key] ?? page17CoverDefaults[field.key]}
-                          onChange={(event) => updatePage17Party(party.setter, field.key, event.target.value)}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ))}
-            </div>
-            <fieldset className="page17-building-types">
-              <legend>3.1 ประเภทของอาคาร (เลือกได้มากกว่า 1 ข้อ)</legend>
-              {page17BuildingTypeOptions.map((option) => (
-                <div className="page17-building-type-row" key={option.key}>
-                  <label className="page17-building-type-option">
-                    <input
-                      type="checkbox"
-                      checked={page17BuildingTypes[option.key]}
-                      onChange={() => togglePage17BuildingType(option.key)}
-                    />
-                    <span>{option.label}</span>
+                    </div>
                   </label>
-                  {option.key === "other" ? (
+                  <label className="field full">
+                    <span>ชื่อบริษัทด้านล่างหน้าปก</span>
                     <input
-                      className="page17-other-input"
-                      disabled={!page17BuildingTypes.other}
-                      maxLength={100}
-                      placeholder="ระบุประเภทอาคารอื่น ๆ"
-                      value={page17OtherText}
-                      onChange={(event) => setPage17OtherText(event.target.value)}
+                      value={getFieldValue("owner_company")}
+                      onChange={(event) => updateFieldValue("owner_company", event.target.value)}
                     />
-                  ) : null}
-                </div>
-              ))}
-            </fieldset>
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 18 ? (
-          <section className="builder-card page18-edit-card">
-            <span className="page-kicker">หน้า 18</span>
-            <h2>รายละเอียดอาคาร การใช้งาน และวัตถุอันตราย</h2>
-            <p>แก้ไขข้อมูลด้านล่างได้เฉพาะหน้า 18 โดย Preview และ PDF ใช้ค่าชุดเดียวกัน</p>
-
-            <fieldset className="page18-section">
-              <legend>3.2 ประเภทอาคารตามลักษณะโครงสร้าง</legend>
-              <label className="field">
-                <span>รายละเอียดบนเส้นประ</span>
-                <textarea
-                  maxLength={450}
-                  rows={4}
-                  value={page18Text.structureDescription}
-                  onChange={(event) => updatePage18Text("structureDescription", event.target.value)}
-                />
-              </label>
-            </fieldset>
-
-            <fieldset className="page18-section">
-              <legend>{page18CheckboxGroups[0].label}</legend>
-              <div className="page18-simple-rows">
-                {[
-                  { option: page18CheckboxGroups[0].options[0], field: "aboveGroundFloors", suffix: "ชั้น" },
-                  { option: page18CheckboxGroups[0].options[1], field: "basementFloors", suffix: "ชั้น" },
-                  { option: page18CheckboxGroups[0].options[2], field: "accessRoadWidth", suffix: "เมตร" }
-                ].map(({ option, field, suffix }) => (
-                  <div className="page18-inline-row" key={option.key}>
-                    <label className="page18-checkbox-option">
-                      <input
-                        type="checkbox"
-                        checked={page18Checks[option.key]}
-                        onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                    <input
-                      aria-label={option.label}
-                      maxLength={20}
-                      value={page18Text[field as keyof Page18TextState]}
-                      onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
-                    />
-                    <span>{suffix}</span>
-                  </div>
-                ))}
-                <div className="page18-inline-row page18-other-row">
-                  <label className="page18-checkbox-option">
-                    <input
-                      type="checkbox"
-                      checked={page18Checks.has_other_building_info}
-                      onChange={() => setPage18Checks((current) => ({
-                        ...current,
-                        has_other_building_info: !current.has_other_building_info
-                      }))}
-                    />
-                    <span>อื่น ๆ (ระบุ)</span>
                   </label>
-                  <textarea
-                    maxLength={300}
-                    rows={3}
-                    value={page18Text.otherBuildingInfo}
-                    onChange={(event) => updatePage18Text("otherBuildingInfo", event.target.value)}
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            <fieldset className="page18-section">
-              <legend>{page18CheckboxGroups[1].label}</legend>
-              {[
-                { option: page18CheckboxGroups[1].options[0], field: "permittedUse" },
-                { option: page18CheckboxGroups[1].options[1], field: "currentUse" }
-              ].map(({ option, field }) => (
-                <div className="page18-inline-row page18-use-row" key={option.key}>
-                  <label className="page18-checkbox-option">
+                  <label className="field full">
+                    <span>อีเมลลูกค้า (สำหรับส่งรายงาน)</span>
                     <input
-                      type="checkbox"
-                      checked={page18Checks[option.key]}
-                      onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
+                      type="email"
+                      value={getFieldValue("customer_email")}
+                      onChange={(event) => updateFieldValue("customer_email", event.target.value)}
+                      placeholder="customer@example.com"
                     />
-                    <span>{option.label}</span>
                   </label>
-                  <input
-                    maxLength={100}
-                    value={page18Text[field as keyof Page18TextState]}
-                    onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
-                  />
+                  {currentPageTextFields
+                    .filter(
+                      (field) =>
+                        field.key !== "cover_year" &&
+                        field.key !== "owner_company"
+                    )
+                    .map((field) => {
+                      const valueKey = field.sourceKey ?? field.key;
+                      return (
+                        <label className="field full" key={field.key}>
+                          <span>{field.label}</span>
+                          <input
+                            type={field.type === "date" ? "date" : field.type === "time" ? "time" : "text"}
+                            value={getFieldValue(valueKey)}
+                            onChange={(event) => updateFieldValue(valueKey, event.target.value)}
+                          />
+                        </label>
+                      );
+                    })}
                 </div>
-              ))}
-            </fieldset>
+              </section>
+            ) : null}
 
-            <fieldset className="page18-section">
-              <legend>{page18CheckboxGroups[2].label}</legend>
-              <div className="page18-material-head" aria-hidden="true">
-                <span>รายการ</span><span>ประเภท</span><span>ปริมาณ</span><span>สถานที่เก็บ</span>
-              </div>
-              {page18MaterialRows.map((row) => (
-                <div className="page18-material-row" key={row.key}>
-                  <label className="page18-checkbox-option">
+            {currentTemplatePage === 14 ? (
+              <section className="builder-card general-building-card">
+                <span className="page-kicker">หน้า 14</span>
+                <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
+                <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
+                <div className="form-grid">
+                  <label className="field full">
+                    <span>วันที่ใบอนุญาตก่อสร้าง</span>
                     <input
-                      type="checkbox"
-                      checked={page18Checks[row.checkboxKey]}
-                      onChange={() => setPage18Checks((current) => ({
-                        ...current,
-                        [row.checkboxKey]: !current[row.checkboxKey]
-                      }))}
+                      type="date"
+                      value={getFieldValue("building_permit_date")}
+                      onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
                     />
-                    <span>{row.label}</span>
                   </label>
-                  {(["type", "quantity", "storage"] as const).map((field) => (
+                  <label className="field full">
+                    <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
                     <input
-                      aria-label={`${row.label} ${field}`}
-                      key={field}
-                      maxLength={60}
-                      value={page18Materials[row.key][field]}
-                      onChange={(event) => updatePage18Material(row.key, field, event.target.value)}
+                      type="date"
+                      value={getFieldValue("controlled_use_permit_date")}
+                      onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
                     />
-                  ))}
+                  </label>
                 </div>
-              ))}
-              <div className="page18-inline-row page18-other-row">
-                <label className="page18-checkbox-option">
-                  <input
-                    type="checkbox"
-                    checked={page18Checks.stores_other_material}
-                    onChange={() => setPage18Checks((current) => ({
-                      ...current,
-                      stores_other_material: !current.stores_other_material
-                    }))}
-                  />
-                  <span>อื่น ๆ (ระบุ)</span>
-                </label>
-                <input
-                  maxLength={150}
-                  value={page18Text.otherMaterial}
-                  onChange={(event) => updatePage18Text("otherMaterial", event.target.value)}
-                />
-              </div>
-            </fieldset>
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 26 ? (
-          <section className="builder-card page25-edit-card">
-            <span className="page-kicker">หน้า 26</span>
-            <h2>ลายเซ็นและวันที่</h2>
-            <p>หากเว้นว่าง ระบบจะคงข้อความเดิมจาก Template ไว้</p>
-
-            <fieldset className="page25-signature-section">
-              <legend>ผู้ตรวจสอบอาคาร</legend>
-              <div className="form-grid">
-                <label className="field">
-                  <span>ชื่อผู้ตรวจสอบ</span>
-                  <input
-                    maxLength={80}
-                    placeholder="ใช้ชื่อเดิมจาก Template"
-                    value={page25Signatures.inspectorName}
-                    onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
-                  />
-                </label>
-                <label className="field">
-                  <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
-                  <input
-                    maxLength={80}
-                    value={page25Signatures.inspectorNote}
-                    onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
-                  />
-                </label>
-                <label className="field">
-                  <span>วันที่ลงนาม</span>
-                  <input
-                    type="date"
-                    value={page25Signatures.inspectionDate}
-                    onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
-                  />
-                </label>
-              </div>
-              <ImageSlot
-                edit={imageEdits.page25_inspector_signature}
-                onReplace={handleReplaceImage}
-                slot={page25SignatureSlots[0]}
-              />
-            </fieldset>
-
-            <fieldset className="page25-signature-section">
-              <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
-              <div className="form-grid">
-                <label className="field">
-                  <span>ชื่อ</span>
-                  <input
-                    maxLength={80}
-                    value={page25Signatures.ownerName}
-                    onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
-                  />
-                </label>
-                <label className="field">
-                  <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
-                  <input
-                    maxLength={80}
-                    value={page25Signatures.ownerPosition}
-                    onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
-                  />
-                </label>
-              </div>
-              <ImageSlot
-                edit={imageEdits.page25_owner_signature}
-                onReplace={handleReplaceImage}
-                slot={page25SignatureSlots[1]}
-              />
-            </fieldset>
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 24 ? (
-          <section className="builder-card page23-edit-card">
-            <span className="page-kicker">หน้า 24</span>
-            <h2>ผลการตรวจสอบ</h2>
-            <p>แต่ละรายการเลือกได้เพียง “ใช้ได้”, “ไม่ได้” หรือ “ไม่มี” หนึ่งค่า และกรอกหมายเหตุได้ตลอดเวลา</p>
-            <div className="page23-result-head" aria-hidden="true">
-              <span>รายการตรวจสอบ</span>
-              <span>ใช้ได้</span>
-              <span>ไม่ได้</span>
-              <span>ไม่มี</span>
-              <span>หมายเหตุ</span>
-            </div>
-            <div className="page23-result-list">
-              {page23ChecklistItems.map((item) => (
-                <div className="page23-result-row" key={item.key}>
-                  <span>{item.label}</span>
-                  {(["usable", "unusable", "unavailable"] as const).map((result) => (
-                    <label className="page23-radio-option" key={result}>
-                      <input
-                        type="radio"
-                        name={`page23-${item.key}`}
-                        checked={page23Results[item.key] === result}
-                        onChange={() => updatePage23Result(item.key, result)}
-                      />
-                      <span>{result === "usable" ? "ใช้ได้" : result === "unusable" ? "ไม่ได้" : "ไม่มี"}</span>
-                    </label>
-                  ))}
-                  <input
-                    className="page23-remark-input"
-                    aria-label={`หมายเหตุ ${item.label}`}
-                    maxLength={60}
-                    placeholder="หมายเหตุ"
-                    value={page23Remarks[item.key]}
-                    onChange={(event) => updatePageRemark(setPage23Remarks, item.key, event.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {currentTemplatePage === 25 ? (
-          <section className="builder-card page23-edit-card">
-            <span className="page-kicker">หน้า 25</span>
-            <h2>ผลการตรวจสอบ</h2>
-            <p>แต่ละรายการเลือกได้เพียง “ใช้ได้”, “ไม่ได้” หรือ “ไม่มี” หนึ่งค่า และกรอกหมายเหตุได้ตลอดเวลา</p>
-            <div className="page23-result-head" aria-hidden="true">
-              <span>รายการตรวจสอบ</span>
-              <span>ใช้ได้</span>
-              <span>ไม่ได้</span>
-              <span>ไม่มี</span>
-              <span>หมายเหตุ</span>
-            </div>
-            <div className="page23-result-list">
-              {page24ChecklistItems.map((item) => (
-                <div className="page23-result-row" key={item.key}>
-                  <span>{item.label}</span>
-                  {(["usable", "unusable", "unavailable"] as const).map((result) => (
-                    <label className="page23-radio-option" key={result}>
-                      <input
-                        type="radio"
-                        name={`page24-${item.key}`}
-                        checked={page24Results[item.key] === result}
-                        onChange={() => updatePage24Result(item.key, result)}
-                      />
-                      <span>{result === "usable" ? "ใช้ได้" : result === "unusable" ? "ไม่ได้" : "ไม่มี"}</span>
-                    </label>
-                  ))}
-                  <input
-                    className="page23-remark-input"
-                    aria-label={`หมายเหตุ ${item.label}`}
-                    maxLength={60}
-                    placeholder="หมายเหตุ"
-                    value={page24Remarks[item.key]}
-                    onChange={(event) => updatePageRemark(setPage24Remarks, item.key, event.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {isChecklistTemplatePage ? (
-          <section className="builder-card checklist-card">
-            <div className="checklist-header">
-              <span>หน้า {currentTemplatePage}</span>
-              <h2>รายการตรวจสอบตาม PDF</h2>
-              <p>เลือกคอลัมน์ความถี่ที่ต้องการให้แสดงใน PDF ระบบจะลบเครื่องหมายถูกเดิมและช่องหมายเหตุเดิมออกก่อน</p>
-            </div>
-            <div className="checklist-frequency-head">
-              <span />
-              {inspectionFrequencyOptions.map((option) => (
-                <strong key={option.key}>{option.label}</strong>
-              ))}
-            </div>
-            <div className="checklist-groups">
-              {currentChecklistGroups.map((group) => (
-                <div className="checklist-group" key={group.title}>
-                  <strong>{group.title}</strong>
-                  {group.items.map((item) => (
-                    <div className="checklist-item" key={item.key}>
-                      <span>{item.label}</span>
-                      {inspectionFrequencyOptions.map((option) => (
-                        <label className="frequency-check" key={option.key}>
+                <div className="page14-checkbox-groups">
+                  {page14CheckboxGroups.map((group) => (
+                    <fieldset className="page14-checkbox-group" key={group.key}>
+                      <legend>{group.label}</legend>
+                      {group.options.map((option) => (
+                        <label className="page14-checkbox-option" key={option.key}>
                           <input
                             type="checkbox"
-                            checked={inspectionChecks[item.key] === option.key}
-                            onChange={() => toggleInspectionCheck(item.key, option.key)}
+                            checked={page14Checks[option.key]}
+                            onChange={() => togglePage14Check(option.key)}
                           />
                           <span>{option.label}</span>
                         </label>
                       ))}
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {currentTemplatePage === 15 ? (
+              <section className="builder-card">
+                <MapLocationField value={mapLocation} onChange={updateMapLocation} />
+              </section>
+            ) : null}
+
+            {currentTemplatePage === 17 ? (
+              <section className="builder-card page17-edit-card">
+                <span className="page-kicker">หน้า 17</span>
+                <h2>เจ้าของ ผู้ครอบครอง และประเภทอาคาร</h2>
+                <p>ข้อมูลที่ยังไม่ได้แก้จะดึงจากหน้า 1 อัตโนมัติ การแก้ไขส่วนนี้มีผลเฉพาะหน้า 17</p>
+                <div className="page17-party-sections">
+                  {[
+                    { key: "owner", title: "2.1 เจ้าของอาคาร", values: page17Owner, setter: setPage17Owner },
+                    { key: "occupant", title: "2.2 ผู้ครอบครองอาคาร", values: page17Occupant, setter: setPage17Occupant }
+                  ].map((party) => (
+                    <fieldset className="page17-party-section" key={party.key}>
+                      <legend>{party.title}</legend>
+                      <div className="form-grid">
+                        {page17PartyFields.map((field) => (
+                          <label className="field" key={field.key}>
+                            <span>{field.label}</span>
+                            <input
+                              maxLength={field.maxLength}
+                              value={party.values[field.key] ?? page17CoverDefaults[field.key]}
+                              onChange={(event) => updatePage17Party(party.setter, field.key, event.target.value)}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                </div>
+                <fieldset className="page17-building-types">
+                  <legend>3.1 ประเภทของอาคาร (เลือกได้มากกว่า 1 ข้อ)</legend>
+                  {page17BuildingTypeOptions.map((option) => (
+                    <div className="page17-building-type-row" key={option.key}>
+                      <label className="page17-building-type-option">
+                        <input
+                          type="checkbox"
+                          checked={page17BuildingTypes[option.key]}
+                          onChange={() => togglePage17BuildingType(option.key)}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                      {option.key === "other" ? (
+                        <input
+                          className="page17-other-input"
+                          disabled={!page17BuildingTypes.other}
+                          maxLength={100}
+                          placeholder="ระบุประเภทอาคารอื่น ๆ"
+                          value={page17OtherText}
+                          onChange={(event) => setPage17OtherText(event.target.value)}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+                </fieldset>
+              </section>
+            ) : null}
+
+            {currentTemplatePage === 18 ? (
+              <section className="builder-card page18-edit-card">
+                <span className="page-kicker">หน้า 18</span>
+                <h2>รายละเอียดอาคาร การใช้งาน และวัตถุอันตราย</h2>
+                <p>แก้ไขข้อมูลด้านล่างได้เฉพาะหน้า 18 โดย Preview และ PDF ใช้ค่าชุดเดียวกัน</p>
+
+                <fieldset className="page18-section">
+                  <legend>3.2 ประเภทอาคารตามลักษณะโครงสร้าง</legend>
+                  <label className="field">
+                    <span>รายละเอียดบนเส้นประ</span>
+                    <textarea
+                      maxLength={450}
+                      rows={4}
+                      value={page18Text.structureDescription}
+                      onChange={(event) => updatePage18Text("structureDescription", event.target.value)}
+                    />
+                  </label>
+                </fieldset>
+
+                <fieldset className="page18-section">
+                  <legend>{page18CheckboxGroups[0].label}</legend>
+                  <div className="page18-simple-rows">
+                    {[
+                      { option: page18CheckboxGroups[0].options[0], field: "aboveGroundFloors", suffix: "ชั้น" },
+                      { option: page18CheckboxGroups[0].options[1], field: "basementFloors", suffix: "ชั้น" },
+                      { option: page18CheckboxGroups[0].options[2], field: "accessRoadWidth", suffix: "เมตร" }
+                    ].map(({ option, field, suffix }) => (
+                      <div className="page18-inline-row" key={option.key}>
+                        <label className="page18-checkbox-option">
+                          <input
+                            type="checkbox"
+                            checked={page18Checks[option.key]}
+                            onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                        <input
+                          aria-label={option.label}
+                          maxLength={20}
+                          value={page18Text[field as keyof Page18TextState]}
+                          onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
+                        />
+                        <span>{suffix}</span>
+                      </div>
+                    ))}
+                    <div className="page18-inline-row page18-other-row">
+                      <label className="page18-checkbox-option">
+                        <input
+                          type="checkbox"
+                          checked={page18Checks.has_other_building_info}
+                          onChange={() => setPage18Checks((current) => ({
+                            ...current,
+                            has_other_building_info: !current.has_other_building_info
+                          }))}
+                        />
+                        <span>อื่น ๆ (ระบุ)</span>
+                      </label>
+                      <textarea
+                        maxLength={300}
+                        rows={3}
+                        value={page18Text.otherBuildingInfo}
+                        onChange={(event) => updatePage18Text("otherBuildingInfo", event.target.value)}
+                      />
+                    </div>
+                  </div>
+                </fieldset>
+
+                <fieldset className="page18-section">
+                  <legend>{page18CheckboxGroups[1].label}</legend>
+                  {[
+                    { option: page18CheckboxGroups[1].options[0], field: "permittedUse" },
+                    { option: page18CheckboxGroups[1].options[1], field: "currentUse" }
+                  ].map(({ option, field }) => (
+                    <div className="page18-inline-row page18-use-row" key={option.key}>
+                      <label className="page18-checkbox-option">
+                        <input
+                          type="checkbox"
+                          checked={page18Checks[option.key]}
+                          onChange={() => setPage18Checks((current) => ({ ...current, [option.key]: !current[option.key] }))}
+                        />
+                        <span>{option.label}</span>
+                      </label>
+                      <input
+                        maxLength={100}
+                        value={page18Text[field as keyof Page18TextState]}
+                        onChange={(event) => updatePage18Text(field as keyof Page18TextState, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                </fieldset>
+
+                <fieldset className="page18-section">
+                  <legend>{page18CheckboxGroups[2].label}</legend>
+                  <div className="page18-material-head" aria-hidden="true">
+                    <span>รายการ</span><span>ประเภท</span><span>ปริมาณ</span><span>สถานที่เก็บ</span>
+                  </div>
+                  {page18MaterialRows.map((row) => (
+                    <div className="page18-material-row" key={row.key}>
+                      <label className="page18-checkbox-option">
+                        <input
+                          type="checkbox"
+                          checked={page18Checks[row.checkboxKey]}
+                          onChange={() => setPage18Checks((current) => ({
+                            ...current,
+                            [row.checkboxKey]: !current[row.checkboxKey]
+                          }))}
+                        />
+                        <span>{row.label}</span>
+                      </label>
+                      {(["type", "quantity", "storage"] as const).map((field) => (
+                        <input
+                          aria-label={`${row.label} ${field}`}
+                          key={field}
+                          maxLength={60}
+                          value={page18Materials[row.key][field]}
+                          onChange={(event) => updatePage18Material(row.key, field, event.target.value)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                  <div className="page18-inline-row page18-other-row">
+                    <label className="page18-checkbox-option">
+                      <input
+                        type="checkbox"
+                        checked={page18Checks.stores_other_material}
+                        onChange={() => setPage18Checks((current) => ({
+                          ...current,
+                          stores_other_material: !current.stores_other_material
+                        }))}
+                      />
+                      <span>อื่น ๆ (ระบุ)</span>
+                    </label>
+                    <input
+                      maxLength={150}
+                      value={page18Text.otherMaterial}
+                      onChange={(event) => updatePage18Text("otherMaterial", event.target.value)}
+                    />
+                  </div>
+                </fieldset>
+              </section>
+            ) : null}
+
+            {currentTemplatePage === 26 ? (
+              <section className="builder-card page25-edit-card">
+                <span className="page-kicker">หน้า 26</span>
+                <h2>ลายเซ็นและวันที่</h2>
+                <p>หากเว้นว่าง ระบบจะคงข้อความเดิมจาก Template ไว้</p>
+
+                <fieldset className="page25-signature-section">
+                  <legend>ผู้ตรวจสอบอาคาร</legend>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>ชื่อผู้ตรวจสอบ</span>
+                      <input
+                        maxLength={80}
+                        placeholder="ใช้ชื่อเดิมจาก Template"
+                        value={page25Signatures.inspectorName}
+                        onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.inspectorNote}
+                        onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>วันที่ลงนาม</span>
+                      <input
+                        type="date"
+                        value={page25Signatures.inspectionDate}
+                        onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <ImageSlot
+                    edit={imageEdits.page25_inspector_signature}
+                    onReplace={handleReplaceImage}
+                    slot={page25SignatureSlots[0]}
+                  />
+                </fieldset>
+
+                <fieldset className="page25-signature-section">
+                  <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>ชื่อ</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.ownerName}
+                        onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.ownerPosition}
+                        onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <ImageSlot
+                    edit={imageEdits.page25_owner_signature}
+                    onReplace={handleReplaceImage}
+                    slot={page25SignatureSlots[1]}
+                  />
+                </fieldset>
+              </section>
+            ) : null}
+
+            {currentTemplatePage === 24 ? (
+              <section className="builder-card page23-edit-card">
+                <span className="page-kicker">หน้า 24</span>
+                <h2>ผลการตรวจสอบ</h2>
+                <p>แต่ละรายการเลือกได้เพียง “ใช้ได้”, “ไม่ได้” หรือ “ไม่มี” หนึ่งค่า และกรอกหมายเหตุได้ตลอดเวลา</p>
+                <div className="page23-result-head" aria-hidden="true">
+                  <span>รายการตรวจสอบ</span>
+                  <span>ใช้ได้</span>
+                  <span>ไม่ได้</span>
+                  <span>ไม่มี</span>
+                  <span>หมายเหตุ</span>
+                </div>
+                <div className="page23-result-list">
+                  {page23ChecklistItems.map((item) => (
+                    <div className="page23-result-row" key={item.key}>
+                      <span>{item.label}</span>
+                      {(["usable", "unusable", "unavailable"] as const).map((result) => (
+                        <label className="page23-radio-option" key={result}>
+                          <input
+                            type="radio"
+                            name={`page23-${item.key}`}
+                            checked={page23Results[item.key] === result}
+                            onChange={() => updatePage23Result(item.key, result)}
+                          />
+                          <span>{result === "usable" ? "ใช้ได้" : result === "unusable" ? "ไม่ได้" : "ไม่มี"}</span>
+                        </label>
+                      ))}
+                      <input
+                        className="page23-remark-input"
+                        aria-label={`หมายเหตุ ${item.label}`}
+                        maxLength={60}
+                        placeholder="หมายเหตุ"
+                        value={page23Remarks[item.key]}
+                        onChange={(event) => updatePageRemark(setPage23Remarks, item.key, event.target.value)}
+                      />
                     </div>
                   ))}
                 </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
+              </section>
+            ) : null}
 
-        {currentTemplatePage >= 2 && currentTemplatePage <= 11 ? (
-          <section className="builder-card page-edit-empty">
-            <span>หน้า {currentTemplatePage}</span>
-            <h2>ไม่มีช่องให้เปลี่ยน</h2>
-            <p>หน้านี้เป็นเนื้อหาคงที่ของ Template จึงไม่มีช่องกรอกหรือรูปภาพให้แก้ไข</p>
-          </section>
-        ) : null}
+            {currentTemplatePage === 25 ? (
+              <section className="builder-card page23-edit-card">
+                <span className="page-kicker">หน้า 25</span>
+                <h2>ผลการตรวจสอบ</h2>
+                <p>แต่ละรายการเลือกได้เพียง “ใช้ได้”, “ไม่ได้” หรือ “ไม่มี” หนึ่งค่า และกรอกหมายเหตุได้ตลอดเวลา</p>
+                <div className="page23-result-head" aria-hidden="true">
+                  <span>รายการตรวจสอบ</span>
+                  <span>ใช้ได้</span>
+                  <span>ไม่ได้</span>
+                  <span>ไม่มี</span>
+                  <span>หมายเหตุ</span>
+                </div>
+                <div className="page23-result-list">
+                  {page24ChecklistItems.map((item) => (
+                    <div className="page23-result-row" key={item.key}>
+                      <span>{item.label}</span>
+                      {(["usable", "unusable", "unavailable"] as const).map((result) => (
+                        <label className="page23-radio-option" key={result}>
+                          <input
+                            type="radio"
+                            name={`page24-${item.key}`}
+                            checked={page24Results[item.key] === result}
+                            onChange={() => updatePage24Result(item.key, result)}
+                          />
+                          <span>{result === "usable" ? "ใช้ได้" : result === "unusable" ? "ไม่ได้" : "ไม่มี"}</span>
+                        </label>
+                      ))}
+                      <input
+                        className="page23-remark-input"
+                        aria-label={`หมายเหตุ ${item.label}`}
+                        maxLength={60}
+                        placeholder="หมายเหตุ"
+                        value={page24Remarks[item.key]}
+                        onChange={(event) => updatePageRemark(setPage24Remarks, item.key, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
-        {currentTemplatePage >= 21 && currentTemplatePage <= 23 ? (
-          <section className="builder-card section2-evidence-card">
-            <span className="page-kicker">หน้า {currentTemplatePage}</span>
-            <h2>รูปหลักฐานของข้อ 2 และข้อ 3</h2>
-            <p>
-              แสดงเฉพาะรายการที่เลือก “ใช้ได้” หรือ “ไม่ได้” ในหน้าตารางสรุป
-              รายการที่เลือก “ไม่มี” จะไม่ปรากฏในหน้านี้
-            </p>
-            {currentEvidenceSlots.length > 0 ? (
-              <div className="upload-grid section2-evidence-upload-grid">
-                {currentEvidenceSlots.map((slot) => (
-                  <ImageSlot
-                    edit={imageEdits[slot.key]}
-                    hasDefaultImage={false}
-                    key={slot.key}
-                    onReplace={handleReplaceImage}
-                    slot={slot}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="page-edit-empty">
-                <h2>ไม่มีรายการที่ต้องแนบรูป</h2>
-                <p>เลือกรายการเป็น “ใช้ได้” หรือ “ไม่ได้” ที่หน้าตารางสรุปเพื่อเปิดช่องอัปโหลด</p>
-              </div>
-            )}
-          </section>
-        ) : null}
+            {isChecklistTemplatePage ? (
+              <section className="builder-card checklist-card">
+                <div className="checklist-header">
+                  <span>หน้า {currentTemplatePage}</span>
+                  <h2>รายการตรวจสอบตาม PDF</h2>
+                  <p>เลือกคอลัมน์ความถี่ที่ต้องการให้แสดงใน PDF ระบบจะลบเครื่องหมายถูกเดิมและช่องหมายเหตุเดิมออกก่อน</p>
+                </div>
+                <div className="checklist-frequency-head">
+                  <span />
+                  {inspectionFrequencyOptions.map((option) => (
+                    <strong key={option.key}>{option.label}</strong>
+                  ))}
+                </div>
+                <div className="checklist-groups">
+                  {currentChecklistGroups.map((group) => (
+                    <div className="checklist-group" key={group.title}>
+                      <strong>{group.title}</strong>
+                      {group.items.map((item) => (
+                        <div className="checklist-item" key={item.key}>
+                          <span>{item.label}</span>
+                          {inspectionFrequencyOptions.map((option) => (
+                            <label className="frequency-check" key={option.key}>
+                              <input
+                                type="checkbox"
+                                checked={inspectionChecks[item.key] === option.key}
+                                onChange={() => toggleInspectionCheck(item.key, option.key)}
+                              />
+                              <span>{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
-        {currentPageImageSlots.length > 0 ? (
-        <section className="builder-card">
-          <div className="image-upload-header">
-            <div>
-              <h2>รูปภาพสำหรับเทมเพลต</h2>
-              <p>เปลี่ยนรูปใน slot เดิมของ Template โดยตำแหน่งและขนาดล็อกไว้ทั้งหมด</p>
-            </div>
-          </div>
+            {currentTemplatePage >= 2 && currentTemplatePage <= 11 ? (
+              <section className="builder-card page-edit-empty">
+                <span>หน้า {currentTemplatePage}</span>
+                <h2>ไม่มีช่องให้เปลี่ยน</h2>
+                <p>หน้านี้เป็นเนื้อหาคงที่ของ Template จึงไม่มีช่องกรอกหรือรูปภาพให้แก้ไข</p>
+              </section>
+            ) : null}
 
-          <div className="upload-grid">
-            {currentPageImageSlots.map((slot) => (
-              <ImageSlot
-                edit={imageEdits[slot.key]}
-                key={slot.key}
-                onReplace={handleReplaceImage}
-                slot={slot}
-              />
-            ))}
-          </div>
-        </section>
-        ) : null}
-        </>
+            {currentTemplatePage >= 21 && currentTemplatePage <= 23 ? (
+              <section className="builder-card section2-evidence-card">
+                <span className="page-kicker">หน้า {currentTemplatePage}</span>
+                <h2>รูปหลักฐานของข้อ 2 และข้อ 3</h2>
+                <p>
+                  แสดงเฉพาะรายการที่เลือก “ใช้ได้” หรือ “ไม่ได้” ในหน้าตารางสรุป
+                  รายการที่เลือก “ไม่มี” จะไม่ปรากฏในหน้านี้
+                </p>
+                {currentEvidenceSlots.length > 0 ? (
+                  <div className="upload-grid section2-evidence-upload-grid">
+                    {currentEvidenceSlots.map((slot) => (
+                      <ImageSlot
+                        edit={imageEdits[slot.key]}
+                        hasDefaultImage={false}
+                        key={slot.key}
+                        onReplace={handleReplaceImage}
+                        slot={slot}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="page-edit-empty">
+                    <h2>ไม่มีรายการที่ต้องแนบรูป</h2>
+                    <p>เลือกรายการเป็น “ใช้ได้” หรือ “ไม่ได้” ที่หน้าตารางสรุปเพื่อเปิดช่องอัปโหลด</p>
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            {currentPageImageSlots.length > 0 ? (
+              <section className="builder-card">
+                <div className="image-upload-header">
+                  <div>
+                    <h2>รูปภาพสำหรับเทมเพลต</h2>
+                    <p>เปลี่ยนรูปใน slot เดิมของ Template โดยตำแหน่งและขนาดล็อกไว้ทั้งหมด</p>
+                  </div>
+                </div>
+
+                <div className="upload-grid">
+                  {currentPageImageSlots.map((slot) => (
+                    <ImageSlot
+                      edit={imageEdits[slot.key]}
+                      key={slot.key}
+                      onReplace={handleReplaceImage}
+                      slot={slot}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </>
         ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 7 ? (
           <section className="builder-card checklist-card maintenance-page7-card">
             <div className="checklist-header">
@@ -1602,7 +1613,23 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                   </div>
                 </label>
 
-                <div className="report-file-card">
+                <label className="field full" style={{ marginTop: "0.75rem" }}>
+                  <span>สำเนาถึง (CC)</span>
+                  <div className="report-email-input">
+                    <Mail size={18} aria-hidden="true" />
+                    <input
+                      type="email"
+                      value={ccEmail}
+                      onChange={(event) => {
+                        setCcEmail(event.target.value);
+                        setEmailError("");
+                      }}
+                      placeholder="cc@example.com"
+                    />
+                  </div>
+                </label>
+
+                <div className="report-file-card" style={{ marginTop: "1rem" }}>
                   <FileText size={28} aria-hidden="true" />
                   <div>
                     <strong>{pdfFileName}</strong>
@@ -1610,8 +1637,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                   </div>
                 </div>
 
-                <p className="report-email-notice">
+                <p className="report-email-notice" style={{ marginTop: "0.75rem" }}>
                   ระบบจะส่งรายงานไปยัง <strong>{recipientEmail.trim() || "example@email.com"}</strong>
+                  {ccEmail.trim() ? <> และ CC ถึง <strong>{ccEmail.trim()}</strong></> : null}
                 </p>
                 {emailError ? <p className="report-email-error" role="alert">{emailError}</p> : null}
 

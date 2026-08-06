@@ -17,6 +17,7 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pdfDocumentCacheRef = useRef<{
     renderState: ReportRenderState;
+    page: number; 
     documentTask: ReturnType<typeof pdfjs.getDocument> | null;
     promise: Promise<PDFDocumentProxy>;
   } | null>(null);
@@ -48,7 +49,11 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        if (pdfDocumentCacheRef.current?.renderState !== renderState) {
+        // 💡 เช็กทั้ง renderState และ page ถ้าอันใดอันหนึ่งเปลี่ยน ให้ล้าง Cache แล้วสร้างใหม่
+        if (
+          pdfDocumentCacheRef.current?.renderState !== renderState ||
+          pdfDocumentCacheRef.current?.page !== page
+        ) {
           const previousEntry = pdfDocumentCacheRef.current;
           if (previousEntry) {
             void previousEntry.promise
@@ -58,11 +63,12 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
 
           const nextEntry = {
             renderState,
+            page, // 💡 บันทึก page ปัจจุบันไว้ใน Cache
             documentTask: null as ReturnType<typeof pdfjs.getDocument> | null,
             promise: Promise.resolve(null as never as PDFDocumentProxy)
           };
           nextEntry.promise = (async () => {
-            const pdfBytes = await createReportPdf(renderState);
+            const pdfBytes = await createReportPdf(renderState, page);
             nextEntry.documentTask = pdfjs.getDocument({ data: pdfBytes.slice() });
             return nextEntry.documentTask.promise;
           })();
@@ -70,7 +76,7 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
         }
         const pdfDocument = await pdfDocumentCacheRef.current.promise;
         if (!isCurrent) return;
-        const pdfPage = await pdfDocument.getPage(page);
+        const pdfPage = await pdfDocument.getPage(1);
         const canvas = canvasRef.current;
         if (!canvas || !isCurrent) return;
         const context = canvas.getContext("2d");
@@ -79,9 +85,9 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
         const baseViewport = pdfPage.getViewport({ scale: 1 });
         const containerWidth = previewWidth || canvas.parentElement?.clientWidth || canvas.clientWidth || baseViewport.width;
         const displayWidth = containerWidth * (zoom / 100);
-        const deviceScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+        const deviceScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.5);
         const fittedScale = (displayWidth / baseViewport.width) * deviceScale;
-        const renderScale = Math.min(Math.max(fittedScale, 2.25), 3);
+        const renderScale = Math.min(Math.max(fittedScale, 1.2), 1.5);
         const viewport = pdfPage.getViewport({ scale: renderScale });
 
         canvas.width = Math.ceil(viewport.width);
@@ -99,7 +105,7 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
         setIsLoading(false);
       } catch (error) {
         const isExpectedCancellation =
-          error instanceof Error && error.name === "RenderingCancelledException";
+          error instanceof Error && (error.name === "RenderingCancelledException" || error.message?.includes("cancelled"));
         if (!isCurrent || isExpectedCancellation) return;
         console.error("[PDF preview render failed]", error);
         setErrorMessage(error instanceof Error ? error.message : "Cannot render PDF preview");
@@ -107,14 +113,23 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
       }
     }
 
-    const renderTimer = window.setTimeout(() => {
-      void renderPdf();
-    }, renderState.templateId === "maintenance-plan" ? 0 : 300);
+    const isPageChanged = pdfDocumentCacheRef.current?.page !== page;
+
+    const renderTimer = window.setTimeout(
+      () => {
+        void renderPdf();
+      },
+      isPageChanged ? 0 : 300 
+    );
 
     return () => {
       isCurrent = false;
       window.clearTimeout(renderTimer);
-      renderTask?.cancel();
+      try {
+        renderTask?.cancel();
+      } catch {
+        // ป้องกัน Error กรณี task ถูกทำลายไปก่อนหน้า
+      }
     };
   }, [page, previewWidth, renderState, zoom]);
 

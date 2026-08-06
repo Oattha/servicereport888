@@ -55,6 +55,7 @@ export function FormInput({
             aria-label={action.label}
             title={action.label}
             onClick={action.onClick}
+            onMouseDown={(e) => e.preventDefault()} // ป้องกัน input เสีย focus เวลาคลิกปุ่ม action
           >
             <ActionIcon size={20} strokeWidth={2.1} aria-hidden="true" />
           </button>

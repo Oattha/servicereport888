@@ -1674,6 +1674,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               >+</button>
             </div>
 
+
             <button
               className="secondary-action small-action"
               type="button"

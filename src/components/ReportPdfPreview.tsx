@@ -49,7 +49,6 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        //  เช็กทั้ง renderState และ page ถ้าอันใดอันหนึ่งเปลี่ยน ให้ล้าง Cache แล้วสร้างใหม่
         if (
           pdfDocumentCacheRef.current?.renderState !== renderState ||
           pdfDocumentCacheRef.current?.page !== page
@@ -63,7 +62,7 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
 
           const nextEntry = {
             renderState,
-            page, //  บันทึก page ปัจจุบันไว้ใน Cache
+            page, 
             documentTask: null as ReturnType<typeof pdfjs.getDocument> | null,
             promise: Promise.resolve(null as never as PDFDocumentProxy)
           };

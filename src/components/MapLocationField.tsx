@@ -19,6 +19,10 @@ const defaultCenter = { lat: 13.7563, lng: 100.5018 };
 type MapLocationFieldProps = {
   value: MapLocationValue;
   onChange: (value: MapLocationValue) => void;
+  pageLabel?: string;
+  title?: string;
+  description?: string;
+  showCoordinates?: boolean;
 };
 
 function formatCoordinate(value: number) {
@@ -34,7 +38,14 @@ function readFileAsDataUrl(file: File) {
   });
 }
 
-export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
+export function MapLocationField({
+  value,
+  onChange,
+  pageLabel = "Page 15",
+  title = "ตำแหน่งแผนที่และรูปสถานที่",
+  description = "กรอกลิงก์ Google Maps และอัปโหลดรูปภาพแผนที่จากการแคปหน้าจอลงในกรอบด้านล่าง",
+  showCoordinates = false
+}: MapLocationFieldProps) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY ?? "";
   const mapCaptureRef = useRef<HTMLDivElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -242,9 +253,9 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
     <section className="map-location-field">
       <div className="map-location-header">
         <div>
-          <span>Page 15</span>
-          <h2>ตำแหน่งแผนที่และรูปสถานที่</h2>
-          <p>กรอกลิงก์ Google Maps และอัปโหลดรูปภาพแผนที่จากการแคปหน้าจอลงในกรอบด้านล่าง</p>
+          <span>{pageLabel}</span>
+          <h2>{title}</h2>
+          <p>{description}</p>
         </div>
         {/*
         <button
@@ -326,37 +337,36 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "1rem" }}>
         <div className="form-grid compact">
-          {/*
-          <label className="field">
-            <span>Latitude</span>
-            <input
-              aria-invalid={value.latitude !== "" && !isValidCoordinate(value.latitude, -90, 90)}
-              inputMode="decimal"
-              max="90"
-              min="-90"
-              step="any"
-              type="number"
-              value={value.latitude}
-              onChange={(event) => handleCoordinateInput("latitude", event.target.value)}
-            />
-          </label>
-          */}
-
-          {/* 
-          <label className="field">
-            <span>Longitude</span>
-            <input
-              aria-invalid={value.longitude !== "" && !isValidCoordinate(value.longitude, -180, 180)}
-              inputMode="decimal"
-              max="180"
-              min="-180"
-              step="any"
-              type="number"
-              value={value.longitude}
-              onChange={(event) => handleCoordinateInput("longitude", event.target.value)}
-            />
-          </label>
-          */}
+          {showCoordinates ? (
+            <>
+              <label className="field">
+                <span>Latitude</span>
+                <input
+                  aria-invalid={value.latitude !== "" && !isValidCoordinate(value.latitude, -90, 90)}
+                  inputMode="decimal"
+                  max="90"
+                  min="-90"
+                  step="any"
+                  type="number"
+                  value={value.latitude}
+                  onChange={(event) => handleCoordinateInput("latitude", event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Longitude</span>
+                <input
+                  aria-invalid={value.longitude !== "" && !isValidCoordinate(value.longitude, -180, 180)}
+                  inputMode="decimal"
+                  max="180"
+                  min="-180"
+                  step="any"
+                  type="number"
+                  value={value.longitude}
+                  onChange={(event) => handleCoordinateInput("longitude", event.target.value)}
+                />
+              </label>
+            </>
+          ) : null}
 
           <label className="field full">
             <span>Google Maps URL</span>
@@ -407,7 +417,7 @@ export function MapLocationField({ value, onChange }: MapLocationFieldProps) {
         {(value.uploadedImageUrl || value.mapScreenshotUrl) && (
           <div className="map-preview-single" style={{ textAlign: "center", marginTop: "0.5rem" }}>
             <span style={{ fontSize: "0.85rem", color: "#64748b", display: "block", marginBottom: "0.5rem" }}>
-              ตัวอย่างรูปภาพแผนที่ที่จะแสดงบน PDF หน้า 15
+              ตัวอย่างรูปภาพแผนที่ที่จะแสดงบน PDF {pageLabel}
             </span>
             <img
               alt="Uploaded map preview"

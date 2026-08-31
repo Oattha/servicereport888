@@ -2,6 +2,7 @@ import { Edit3, FilePlus2, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { LoadingSpinner, SkeletonTable } from "../components/LoadingSpinner";
+import { getReportTemplate } from "../data/reportTemplates";
 import { getReportDrafts } from "../lib/reportDrafts";
 import type { ReportDraft } from "../types";
 
@@ -18,9 +19,7 @@ function formatUpdatedAt(value: string) {
 }
 
 function getTemplateName(draft: ReportDraft) {
-  return draft.templateId === "maintenance-plan"
-    ? "แผนปฏิบัติการการตรวจบำรุงรักษาอาคาร"
-    : "รายงานตรวจสอบอาคาร (ประจำปี)";
+  return getReportTemplate(draft.templateId).name;
 }
 
 export function MyReportsPage({ onCreateReport, onEditDraft }: MyReportsPageProps) {

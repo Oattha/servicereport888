@@ -5,19 +5,45 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { MyReportsPage } from "./pages/MyReportsPage";
 import { AllReportsPage } from "./pages/AllReportsPage";
 import { UsersPage } from "./pages/UsersPage";
+import { HomePage } from "./pages/HomePage";
 import { onUnauthorized, setAuthToken } from "./lib/http";
 import type { AppSection, ReportDraft } from "./types";
 
 const persistentAuthKey = "service-report-authenticated";
 const sessionAuthKey = "service-report-session-authenticated";
 
+type EntryRoute = "home" | "building-login" | "service-login" | "app";
+
+function getEntryRoute(): EntryRoute {
+  if (window.location.pathname === "/building-login" || window.location.pathname === "/login") return "building-login";
+  if (window.location.pathname === "/service-login") return "service-login";
+  if (window.location.pathname === "/app") return "app";
+  return "home";
+}
+
 export function App() {
+  const [entryRoute, setEntryRoute] = useState<EntryRoute>(getEntryRoute);
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => localStorage.getItem(persistentAuthKey) === "true"
       || sessionStorage.getItem(sessionAuthKey) === "true"
   );
   const [activeSection, setActiveSection] = useState<AppSection>("reports");
   const [editingDraft, setEditingDraft] = useState<ReportDraft | null>(null);
+
+  function navigateEntry(route: EntryRoute, replace = false) {
+    const path = {
+      home: "/",
+      "building-login": "/building-login",
+      "service-login": "/service-login",
+      app: "/app"
+    }[route];
+    window.history[replace ? "replaceState" : "pushState"]({}, "", path);
+    setEntryRoute(route);
+  }
+
+  function openServiceLogin() {
+    window.location.assign("/service/");
+  }
 
   function startNewReport() {
     setEditingDraft(null);
@@ -43,6 +69,7 @@ export function App() {
       localStorage.removeItem(persistentAuthKey);
     }
     setIsAuthenticated(true);
+    navigateEntry("app", true);
   }
 
   function handleLogout() {
@@ -50,6 +77,7 @@ export function App() {
     sessionStorage.removeItem(sessionAuthKey);
     setAuthToken(null);
     setIsAuthenticated(false);
+    navigateEntry("building-login", true);
   }
 
   useEffect(() => {
@@ -58,8 +86,27 @@ export function App() {
     });
   }, []);
 
+  useEffect(() => {
+    const handlePopState = () => setEntryRoute(getEntryRoute());
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  if (entryRoute === "home") {
+    return (
+      <HomePage
+        onBuildingLogin={() => navigateEntry("building-login")}
+        onServiceLogin={openServiceLogin}
+      />
+    );
+  }
+
+  if (entryRoute === "building-login" || entryRoute === "service-login") {
+    return <LoginPage onLogin={handleLogin} system={entryRoute === "service-login" ? "service" : "building"} />;
+  }
+
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} system="building" />;
   }
 
   const page = {

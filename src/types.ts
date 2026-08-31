@@ -9,6 +9,43 @@ import type {
   MaintenancePlanPage19SignatureState,
   MaintenancePlanPage19Values
 } from "./data/maintenancePlanPage19";
+import type { SignMaintenanceFormState } from "./data/signMaintenancePlan";
+import type { SignInspectionPage15State } from "./data/signInspectionPage15";
+import type { SignInspectionPage13State } from "./data/signInspectionPage13";
+import type { SignInspectionPage12State } from "./data/signInspectionPage12";
+import type { SignInspectionPage9State } from "./data/signInspectionPage9";
+import type { SignInspectionPage7State } from "./data/signInspectionPage7";
+import type { SignInspectionPage8State } from "./data/signInspectionPage8";
+import type { SignInspectionPage4State } from "./data/signInspectionPage4";
+import type {
+  MixingWorkshopPage14Checks,
+  MixingWorkshopPage15Checks,
+  MixingWorkshopRemarks
+} from "./data/mixingWorkshopPage14";
+import type {
+  MixingWorkshopPage24Checks,
+  MixingWorkshopPage24Remarks
+} from "./data/mixingWorkshopPage24";
+import type {
+  MixingWorkshopPage23Checks,
+  MixingWorkshopPage23Remarks
+} from "./data/mixingWorkshopPage23";
+import type {
+  MixingWorkshopPage25Checks,
+  MixingWorkshopPage25Remarks
+} from "./data/mixingWorkshopPage25";
+import type {
+  MixingWorkshopPage26Checks,
+  MixingWorkshopPage26Remarks
+} from "./data/mixingWorkshopPage26";
+import type {
+  MixingWorkshopExtendedChecks,
+  MixingWorkshopExtendedRemarks
+} from "./data/mixingWorkshopPages27To32";
+import type {
+  MixingWorkshopSummaryChoices,
+  MixingWorkshopSummaryRemarks
+} from "./data/mixingWorkshopPages34To35";
 
 export type AppSection = "reports" | "my-reports" | "all-reports" | "users";
 
@@ -37,6 +74,61 @@ export type SharedReport = {
   recipientEmail?: string | null; 
   emailSentAt?: string | null;    
   updatedAt: string;
+  data?: ReportRenderState | null;
+};
+
+export type CompanySearchResult = {
+  id: string;
+  name: string;
+  normalizedName: string;
+  aliases: string[];
+  emails: string[];
+  buildingCount: number;
+  reportCount: number;
+  lastActivityAt: string;
+  matchType: "exact" | "similar";
+  score: number;
+};
+
+export type CompanyHistory = {
+  company: {
+    id: string;
+    normalizedName: string;
+    names: string[];
+    emails: string[];
+    phones: string[];
+    customerIds: string[];
+    createdAt: string;
+    updatedAt: string;
+  };
+  buildings: Array<{
+    id: string;
+    customerId: string;
+    name: string;
+    address: string | null;
+    province: string | null;
+    postalCode: string | null;
+    phone: string | null;
+    fax: string | null;
+    gpsLat: string | null;
+    gpsLng: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  reports: Array<{
+    id: string;
+    reportNo: string;
+    status: "draft" | "in_review" | "ready" | "sent";
+    progress: number;
+    inspectionDate: string | null;
+    recipientEmail: string | null;
+    data: ReportRenderState | null;
+    createdAt: string;
+    updatedAt: string;
+    building: string;
+    buildingAddress: string | null;
+    template: string;
+  }>;
 };
 
 export type Template = {
@@ -204,20 +296,51 @@ export type Page25SignatureState = {
   ownerPosition: string;
 };
 
+export type AnnualAssessmentResult = "pass" | "fail" | null;
+
 export type Page23Result = "usable" | "unusable" | "unavailable" | null;
 export type Page23ResultState = Record<string, Page23Result>;
 export type Page23RemarkState = Record<string, string>;
 
-export type ReportTemplateId = "annual-inspection" | "maintenance-plan";
+export type ReportTemplateId =
+  | "annual-inspection"
+  | "maintenance-plan"
+  | "sign-inspection-report"
+  | "sign-maintenance-plan"
+  | "mixing-workshop-maintenance-plan";
 
 export type ReportRenderState = {
   templateId: ReportTemplateId;
+  annualAssessmentResult: AnnualAssessmentResult;
   maintenancePlanPage7Checks: MaintenancePlanPage7Checks;
   maintenancePlanPage8Checks: MaintenancePlanPage8Checks;
   maintenancePlanPages9To16Checks: MaintenancePlanPages9To16Checks;
   maintenancePlanPage18Values: MaintenancePlanPage18Values;
   maintenancePlanPage19Values: MaintenancePlanPage19Values;
   maintenancePlanPage19Signature: MaintenancePlanPage19SignatureState;
+  signMaintenanceForm: SignMaintenanceFormState;
+  signInspectionPage15Choices: SignInspectionPage15State;
+  signInspectionPage13State: SignInspectionPage13State;
+  signInspectionPage12State: SignInspectionPage12State;
+  signInspectionPage9State: SignInspectionPage9State;
+  signInspectionPage7State: SignInspectionPage7State;
+  signInspectionPage8State: SignInspectionPage8State;
+  signInspectionPage4State: SignInspectionPage4State;
+  mixingWorkshopPage14Checks: MixingWorkshopPage14Checks;
+  mixingWorkshopPage15Checks: MixingWorkshopPage15Checks;
+  mixingWorkshopRemarks: MixingWorkshopRemarks;
+  mixingWorkshopPage23Checks: MixingWorkshopPage23Checks;
+  mixingWorkshopPage23Remarks: MixingWorkshopPage23Remarks;
+  mixingWorkshopPage24Checks: MixingWorkshopPage24Checks;
+  mixingWorkshopPage24Remarks: MixingWorkshopPage24Remarks;
+  mixingWorkshopPage25Checks: MixingWorkshopPage25Checks;
+  mixingWorkshopPage25Remarks: MixingWorkshopPage25Remarks;
+  mixingWorkshopPage26Checks: MixingWorkshopPage26Checks;
+  mixingWorkshopPage26Remarks: MixingWorkshopPage26Remarks;
+  mixingWorkshopPages27To32Checks: MixingWorkshopExtendedChecks;
+  mixingWorkshopPages27To32Remarks: MixingWorkshopExtendedRemarks;
+  mixingWorkshopPages34To35Choices: MixingWorkshopSummaryChoices;
+  mixingWorkshopPages34To35Remarks: MixingWorkshopSummaryRemarks;
   fieldValues: Record<string, string>;
   inspectionChecks: Record<string, InspectionFrequency | null>;
   page14Checks: Page14CheckboxState;

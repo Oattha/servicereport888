@@ -2,17 +2,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Check,
+  Building2,
+  Database,
   Download,
+  Eraser,
   Expand,
   Loader2,
   FileText,
   LockKeyhole,
   Mail,
+  MessageSquare,
   Save,
+  Search,
   Send,
   X
 } from "lucide-react";
 import { ImageSlot } from "../components/ImageSlot";
+import { BusinessCardScanner } from "../components/BusinessCardScanner";
 import { MapLocationField } from "../components/MapLocationField";
 import { ReportPdfPreview } from "../components/ReportPdfPreview";
 import {
@@ -72,7 +78,114 @@ import {
   maintenancePlanPage19Items,
   maintenancePlanPage19SignatureSlot
 } from "../data/maintenancePlanPage19";
+import {
+  defaultSignMaintenanceFormState,
+  getSignMaintenanceRowsForPage,
+  signMaintenanceFrequencyOptions,
+  signMaintenanceResultOptions,
+  type SignMaintenanceChoice,
+  type SignMaintenanceRemarkKind
+} from "../data/signMaintenancePlan";
+import {
+  defaultSignInspectionPage15Choices,
+  signInspectionPage15Options,
+  signInspectionPage15Rows,
+  type SignInspectionPage15Choice
+} from "../data/signInspectionPage15";
+import { signInspectionPage14ImageSlots } from "../data/signInspectionPage14";
+import { getSignInspectionImageSlotsForPage } from "../data/signInspectionPages5To6";
+import {
+  defaultSignInspectionPage13State,
+  signInspectionPage13Groups,
+  signInspectionPage13Rows,
+  type SignInspectionPage13RowState
+} from "../data/signInspectionPage13";
+import {
+  defaultSignInspectionPage12State,
+  signInspectionPage12Groups,
+  signInspectionPage12Rows
+} from "../data/signInspectionPage12";
+import {
+  defaultSignInspectionPage9State,
+  getSignInspectionChangeSectionsForPage,
+  signInspectionPage9Sections,
+  type SignInspectionPage9ChangeChoice,
+  type SignInspectionPage9Opinion,
+  type SignInspectionPage9SectionState
+} from "../data/signInspectionPage9";
+import {
+  defaultSignInspectionPage7State,
+  hasBuildingMountedSign,
+  signInspectionPage7TypeOptions,
+  type SignInspectionPage7Contact,
+  type SignInspectionPage7Group,
+  type SignInspectionPage7TypeKey
+} from "../data/signInspectionPage7";
+import {
+  defaultSignInspectionPage8State,
+  signInspectionPage8ImageSlots,
+  signInspectionPage8MaterialOptions,
+  type SignInspectionPage8MaterialKey
+} from "../data/signInspectionPage8";
+import {
+  defaultSignInspectionPage4MapLocation,
+  defaultSignInspectionPage4State,
+  signInspectionPage4MapSlot
+} from "../data/signInspectionPage4";
+import {
+  defaultSignInspectionCoverFields,
+  signInspectionCoverFieldKeys,
+  signInspectionCoverImageSlot
+} from "../data/signInspectionCover";
+import {
+  defaultMixingWorkshopPage14Checks,
+  defaultMixingWorkshopPage15Checks,
+  defaultMixingWorkshopRemarks,
+  mixingWorkshopPage14FrequencyOptions,
+  mixingWorkshopPage14Groups,
+  mixingWorkshopPage15Groups,
+  type MixingWorkshopPage14Frequency
+} from "../data/mixingWorkshopPage14";
+import {
+  defaultMixingWorkshopPage23Checks,
+  defaultMixingWorkshopPage23Remarks,
+  mixingWorkshopPage23Groups
+} from "../data/mixingWorkshopPage23";
+import {
+  defaultMixingWorkshopPage24Checks,
+  defaultMixingWorkshopPage24Remarks,
+  mixingWorkshopPage24FrequencyOptions,
+  mixingWorkshopPage24Groups,
+  type MixingWorkshopPage24Frequency
+} from "../data/mixingWorkshopPage24";
+import {
+  defaultMixingWorkshopPage25Checks,
+  defaultMixingWorkshopPage25Remarks,
+  mixingWorkshopPage25Groups
+} from "../data/mixingWorkshopPage25";
+import {
+  defaultMixingWorkshopPage26Checks,
+  defaultMixingWorkshopPage26Remarks,
+  mixingWorkshopPage26Groups
+} from "../data/mixingWorkshopPage26";
+import {
+  defaultMixingWorkshopPages27To32Checks,
+  defaultMixingWorkshopPages27To32Remarks,
+  getMixingWorkshopExtendedDefinition,
+  type MixingWorkshopExtendedPage
+} from "../data/mixingWorkshopPages27To32";
+import {
+  defaultMixingWorkshopPages34To35Choices,
+  defaultMixingWorkshopPages34To35Remarks,
+  getMixingWorkshopSummaryDefinition,
+  mixingWorkshopSummaryOptions,
+  type MixingWorkshopSummaryChoice,
+  type MixingWorkshopSummaryPage
+} from "../data/mixingWorkshopPages34To35";
 import type {
+  AnnualAssessmentResult,
+  CompanyHistory,
+  CompanySearchResult,
   MapLocationValue,
   Page17PartyFieldKey,
   Page17PartyOverrides,
@@ -90,7 +203,13 @@ import { createReportPdf } from "../utils/reportRenderer";
 import { ReplaceImage } from "../utils/templateEditing";
 import { saveReportDraft } from "../lib/reportDrafts";
 import { deleteReportDraft } from "../lib/reportDrafts";
-import { completeReport, sendReportEmail, uploadImage } from "../lib/api";
+import {
+  completeReport,
+  getCompanyHistory,
+  searchCompanies,
+  sendReportEmail,
+  uploadImage
+} from "../lib/api";
 
 const buildingTypes = [
   "อาคารสูง",
@@ -130,7 +249,8 @@ function getTemplatePageImage(templateId: ReportTemplateId, page: number) {
     : templateId === "annual-inspection" && page >= 24
       ? page - 1
       : page;
-  return `${template.thumbnailDirectory}/page-${String(sourcePage).padStart(2, "0")}.png`;
+  const assetVersion = template.assetVersion ? `?v=${template.assetVersion}` : "";
+  return `${template.thumbnailDirectory}/page-${String(sourcePage).padStart(2, "0")}.png${assetVersion}`;
 }
 
 function pdfBytesToBase64(pdfBytes: Uint8Array) {
@@ -158,6 +278,12 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [completeSaveStatus, setCompleteSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [completedReportId, setCompletedReportId] = useState<string | null>(null);
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [companySearchResults, setCompanySearchResults] = useState<CompanySearchResult[]>([]);
+  const [companySearchStatus, setCompanySearchStatus] = useState<"idle" | "searching" | "error">("idle");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [selectedCompanyName, setSelectedCompanyName] = useState("");
+  const [companyHistory, setCompanyHistory] = useState<CompanyHistory | null>(null);
+  const [companyHistoryStatus, setCompanyHistoryStatus] = useState<"idle" | "loading" | "error">("idle");
 
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -176,9 +302,15 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     ...defaultTemplateFieldValues,
+    ...defaultSignInspectionCoverFields,
     building_permit_date: initialState?.fieldValues?.building_permit_date || getCurrentDateString(),
     controlled_use_permit_date: initialState?.fieldValues?.controlled_use_permit_date || getCurrentDateString(),
-    ...initialState?.fieldValues
+    ...initialState?.fieldValues,
+    [signInspectionCoverFieldKeys.yearSuffix]:
+      initialState?.fieldValues?.[signInspectionCoverFieldKeys.yearSuffix] === "68"
+        ? "69"
+        : initialState?.fieldValues?.[signInspectionCoverFieldKeys.yearSuffix]
+          ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.yearSuffix]
   });
 
   const [mapLocation, setMapLocation] = useState<MapLocationValue>({
@@ -227,6 +359,160 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     ...defaultMaintenancePlanPage19Signature,
     ...initialState?.maintenancePlanPage19Signature
   });
+  const [signMaintenanceForm, setSignMaintenanceForm] = useState(() => ({
+    choices: {
+      ...defaultSignMaintenanceFormState.choices,
+      ...initialState?.signMaintenanceForm?.choices
+    },
+    remarks: Object.fromEntries(
+      Object.keys(defaultSignMaintenanceFormState.remarks).map((key) => [
+        key,
+        {
+          ...defaultSignMaintenanceFormState.remarks[key],
+          ...initialState?.signMaintenanceForm?.remarks?.[key]
+        }
+      ])
+    )
+  }));
+  const [signInspectionPage15Choices, setSignInspectionPage15Choices] = useState({
+    ...defaultSignInspectionPage15Choices,
+    ...initialState?.signInspectionPage15Choices
+  });
+  const [signInspectionPage13State, setSignInspectionPage13State] = useState(() =>
+    Object.fromEntries(signInspectionPage13Rows.map((row) => [
+      row.key,
+      {
+        ...defaultSignInspectionPage13State[row.key],
+        ...initialState?.signInspectionPage13State?.[row.key]
+      }
+    ]))
+  );
+  const [signInspectionPage12State, setSignInspectionPage12State] = useState(() =>
+    Object.fromEntries(signInspectionPage12Rows.map((row) => [
+      row.key,
+      {
+        ...defaultSignInspectionPage12State[row.key],
+        ...initialState?.signInspectionPage12State?.[row.key]
+      }
+    ]))
+  );
+  const [signInspectionPage9State, setSignInspectionPage9State] = useState(() =>
+    Object.fromEntries(signInspectionPage9Sections.map((section) => [
+      section.key,
+      {
+        ...defaultSignInspectionPage9State[section.key],
+        ...initialState?.signInspectionPage9State?.[section.key]
+      }
+    ]))
+  );
+  const [signInspectionPage7State, setSignInspectionPage7State] = useState(() => {
+    const saved = initialState?.signInspectionPage7State;
+    return {
+      ...defaultSignInspectionPage7State,
+      ...saved,
+      signTypes: { ...defaultSignInspectionPage7State.signTypes, ...saved?.signTypes },
+      ground: {
+        ...defaultSignInspectionPage7State.ground,
+        ...saved?.ground,
+        signOwner: { ...defaultSignInspectionPage7State.ground.signOwner, ...saved?.ground?.signOwner },
+        buildingOwner: { ...defaultSignInspectionPage7State.ground.buildingOwner, ...saved?.ground?.buildingOwner }
+      },
+      building: {
+        ...defaultSignInspectionPage7State.building,
+        ...saved?.building,
+        signOwner: { ...defaultSignInspectionPage7State.building.signOwner, ...saved?.building?.signOwner },
+        buildingOwner: { ...defaultSignInspectionPage7State.building.buildingOwner, ...saved?.building?.buildingOwner }
+      }
+    };
+  });
+  const [signInspectionPage4State, setSignInspectionPage4State] = useState(() => {
+    const saved = initialState?.signInspectionPage4State;
+    return {
+      ...defaultSignInspectionPage4State,
+      ...saved,
+      mapLocation: {
+        ...defaultSignInspectionPage4MapLocation,
+        ...saved?.mapLocation
+      }
+    };
+  });
+  const [signInspectionPage8State, setSignInspectionPage8State] = useState(() => {
+    const saved = initialState?.signInspectionPage8State;
+    return {
+      ...defaultSignInspectionPage8State,
+      ...saved,
+      materials: { ...defaultSignInspectionPage8State.materials, ...saved?.materials }
+    };
+  });
+  const [signMaintenanceTool, setSignMaintenanceTool] = useState<"check" | "remark">("check");
+  const [mixingWorkshopPage14Checks, setMixingWorkshopPage14Checks] = useState({
+    ...defaultMixingWorkshopPage14Checks,
+    ...initialState?.mixingWorkshopPage14Checks
+  });
+  const [mixingWorkshopPage15Checks, setMixingWorkshopPage15Checks] = useState({
+    ...defaultMixingWorkshopPage15Checks,
+    ...initialState?.mixingWorkshopPage15Checks
+  });
+  const [mixingWorkshopRemarks, setMixingWorkshopRemarks] = useState({
+    ...defaultMixingWorkshopRemarks,
+    ...initialState?.mixingWorkshopRemarks
+  });
+  const [mixingWorkshopPage23Checks, setMixingWorkshopPage23Checks] = useState({
+    ...defaultMixingWorkshopPage23Checks,
+    ...initialState?.mixingWorkshopPage23Checks
+  });
+  const [mixingWorkshopPage23Remarks, setMixingWorkshopPage23Remarks] = useState({
+    ...defaultMixingWorkshopPage23Remarks,
+    ...initialState?.mixingWorkshopPage23Remarks
+  });
+  const [mixingWorkshopPage24Checks, setMixingWorkshopPage24Checks] = useState({
+    ...defaultMixingWorkshopPage24Checks,
+    ...initialState?.mixingWorkshopPage24Checks
+  });
+  const [mixingWorkshopPage24Remarks, setMixingWorkshopPage24Remarks] = useState({
+    ...defaultMixingWorkshopPage24Remarks,
+    ...initialState?.mixingWorkshopPage24Remarks
+  });
+  const [mixingWorkshopPage25Checks, setMixingWorkshopPage25Checks] = useState({
+    ...defaultMixingWorkshopPage25Checks,
+    ...initialState?.mixingWorkshopPage25Checks
+  });
+  const [mixingWorkshopPage25Remarks, setMixingWorkshopPage25Remarks] = useState({
+    ...defaultMixingWorkshopPage25Remarks,
+    ...initialState?.mixingWorkshopPage25Remarks
+  });
+  const [mixingWorkshopPage26Checks, setMixingWorkshopPage26Checks] = useState({
+    ...defaultMixingWorkshopPage26Checks,
+    ...initialState?.mixingWorkshopPage26Checks
+  });
+  const [mixingWorkshopPage26Remarks, setMixingWorkshopPage26Remarks] = useState({
+    ...defaultMixingWorkshopPage26Remarks,
+    ...initialState?.mixingWorkshopPage26Remarks
+  });
+  const [mixingWorkshopPages27To32Checks, setMixingWorkshopPages27To32Checks] = useState(() =>
+    Object.fromEntries(Object.entries(defaultMixingWorkshopPages27To32Checks).map(([page, checks]) => [
+      page,
+      { ...checks, ...(initialState?.mixingWorkshopPages27To32Checks?.[Number(page) as MixingWorkshopExtendedPage] ?? {}) }
+    ])) as typeof defaultMixingWorkshopPages27To32Checks
+  );
+  const [mixingWorkshopPages27To32Remarks, setMixingWorkshopPages27To32Remarks] = useState(() =>
+    Object.fromEntries(Object.entries(defaultMixingWorkshopPages27To32Remarks).map(([page, remarks]) => [
+      page,
+      { ...remarks, ...(initialState?.mixingWorkshopPages27To32Remarks?.[Number(page) as MixingWorkshopExtendedPage] ?? {}) }
+    ])) as typeof defaultMixingWorkshopPages27To32Remarks
+  );
+  const [mixingWorkshopPages34To35Choices, setMixingWorkshopPages34To35Choices] = useState(() =>
+    Object.fromEntries(Object.entries(defaultMixingWorkshopPages34To35Choices).map(([page, choices]) => [
+      page,
+      { ...choices, ...(initialState?.mixingWorkshopPages34To35Choices?.[Number(page) as MixingWorkshopSummaryPage] ?? {}) }
+    ])) as typeof defaultMixingWorkshopPages34To35Choices
+  );
+  const [mixingWorkshopPages34To35Remarks, setMixingWorkshopPages34To35Remarks] = useState(() =>
+    Object.fromEntries(Object.entries(defaultMixingWorkshopPages34To35Remarks).map(([page, remarks]) => [
+      page,
+      { ...remarks, ...(initialState?.mixingWorkshopPages34To35Remarks?.[Number(page) as MixingWorkshopSummaryPage] ?? {}) }
+    ])) as typeof defaultMixingWorkshopPages34To35Remarks
+  );
   const [page14Checks, setPage14Checks] = useState({ ...defaultPage14Checkboxes, ...initialState?.page14Checks });
   const [page17Owner, setPage17Owner] = useState<Page17PartyOverrides>(initialState?.page17Owner ?? {});
   const [page17Occupant, setPage17Occupant] = useState<Page17PartyOverrides>(initialState?.page17Occupant ?? {});
@@ -244,6 +530,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [page23Remarks, setPage23Remarks] = useState({ ...defaultPage23Remarks, ...initialState?.page23Remarks });
   const [page24Results, setPage24Results] = useState({ ...defaultPage24Results, ...initialState?.page24Results });
   const [page24Remarks, setPage24Remarks] = useState({ ...defaultPage24Remarks, ...initialState?.page24Remarks });
+  const [annualAssessmentResult, setAnnualAssessmentResult] = useState<AnnualAssessmentResult>(
+    initialState?.annualAssessmentResult ?? null
+  );
   
   const [page25Signatures, setPage25Signatures] = useState({
     ...defaultPage25Signatures,
@@ -259,6 +548,37 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       if (edit.objectUrl.startsWith("blob:")) URL.revokeObjectURL(edit.objectUrl);
     });
   }, []);
+
+  useEffect(() => {
+    const query = fieldValues.owner_company?.trim() ?? "";
+    if (!query || selectedCompanyId) {
+      setCompanySearchResults([]);
+      setCompanySearchStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setCompanySearchStatus("searching");
+    const timeoutId = window.setTimeout(() => {
+      searchCompanies(query)
+        .then((results) => {
+          if (cancelled) return;
+          setCompanySearchResults(results);
+          setCompanySearchStatus("idle");
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          console.error("[Company search failed]", error);
+          setCompanySearchResults([]);
+          setCompanySearchStatus("error");
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [fieldValues.owner_company, selectedCompanyId]);
 
   const selectedTemplate = useMemo(() => getReportTemplate(selectedTemplateId), [selectedTemplateId]);
   const previewPages = useMemo(
@@ -321,6 +641,53 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const currentMaintenancePlanSummaryValues = currentTemplatePage === 19
     ? maintenancePlanPage19Values
     : maintenancePlanPage18Values;
+  const currentSignMaintenanceRows = useMemo(
+    () => getSignMaintenanceRowsForPage(currentTemplatePage).filter(
+      (row) => currentTemplatePage !== 6 || row.kind === "result"
+    ),
+    [currentTemplatePage]
+  );
+  const currentMixingWorkshopGroups = currentTemplatePage === 15
+    ? mixingWorkshopPage15Groups
+    : mixingWorkshopPage14Groups;
+  const currentMixingWorkshopChecks = currentTemplatePage === 15
+    ? mixingWorkshopPage15Checks
+    : mixingWorkshopPage14Checks;
+  const currentMixingWorkshopExtendedDefinition = getMixingWorkshopExtendedDefinition(currentTemplatePage);
+  const currentMixingWorkshopDetailedGroups = currentMixingWorkshopExtendedDefinition
+    ? currentMixingWorkshopExtendedDefinition.groups
+    : currentTemplatePage === 23
+      ? mixingWorkshopPage23Groups
+    : currentTemplatePage === 26
+    ? mixingWorkshopPage26Groups
+    : currentTemplatePage === 25
+      ? mixingWorkshopPage25Groups
+      : mixingWorkshopPage24Groups;
+  const currentMixingWorkshopDetailedChecks = currentMixingWorkshopExtendedDefinition
+    ? mixingWorkshopPages27To32Checks[currentMixingWorkshopExtendedDefinition.page]
+    : currentTemplatePage === 23
+      ? mixingWorkshopPage23Checks
+    : currentTemplatePage === 26
+    ? mixingWorkshopPage26Checks
+    : currentTemplatePage === 25
+      ? mixingWorkshopPage25Checks
+      : mixingWorkshopPage24Checks;
+  const currentMixingWorkshopDetailedRemarks = currentMixingWorkshopExtendedDefinition
+    ? mixingWorkshopPages27To32Remarks[currentMixingWorkshopExtendedDefinition.page]
+    : currentTemplatePage === 23
+      ? mixingWorkshopPage23Remarks
+    : currentTemplatePage === 26
+    ? mixingWorkshopPage26Remarks
+    : currentTemplatePage === 25
+      ? mixingWorkshopPage25Remarks
+      : mixingWorkshopPage24Remarks;
+  const currentMixingWorkshopSummaryDefinition = getMixingWorkshopSummaryDefinition(currentTemplatePage);
+  const currentMixingWorkshopSummaryChoices = currentMixingWorkshopSummaryDefinition
+    ? mixingWorkshopPages34To35Choices[currentMixingWorkshopSummaryDefinition.page]
+    : {};
+  const currentMixingWorkshopSummaryRemarks = currentMixingWorkshopSummaryDefinition
+    ? mixingWorkshopPages34To35Remarks[currentMixingWorkshopSummaryDefinition.page]
+    : {};
 
   async function handleReplaceImage(slotKey: string, file: File) {
     try {
@@ -351,6 +718,70 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     }));
   }
 
+  function handleCompanyNameChange(value: string) {
+    updateFieldValue("owner_company", value);
+    setSelectedCompanyId(null);
+    setSelectedCompanyName("");
+    setCompanyHistory(null);
+    setCompanyHistoryStatus("idle");
+  }
+
+  async function handleCompanySelect(company: CompanySearchResult) {
+    setSelectedCompanyId(company.id);
+    setSelectedCompanyName(company.name);
+    setCompanySearchResults([]);
+    setCompanyHistoryStatus("loading");
+    try {
+      const history = await getCompanyHistory(company.id);
+      setCompanyHistory(history);
+      setCompanyHistoryStatus("idle");
+    } catch (error) {
+      console.error("[Load company history failed]", error);
+      setCompanyHistory(null);
+      setCompanyHistoryStatus("error");
+    }
+  }
+
+  async function handleBusinessCardConfirm(fields: { companyName: string; companyAddress: string }) {
+    handleCompanyNameChange(fields.companyName);
+    if (fields.companyAddress) updateFieldValue("building_address", fields.companyAddress);
+    setCompanySearchStatus("searching");
+
+    try {
+      const results = await searchCompanies(fields.companyName);
+      const exactMatch = results.find((company) => company.matchType === "exact");
+      setCompanySearchResults(results);
+      setCompanySearchStatus("idle");
+      if (exactMatch) await handleCompanySelect(exactMatch);
+    } catch (error) {
+      console.error("[Business card company search failed]", error);
+      setCompanySearchResults([]);
+      setCompanySearchStatus("error");
+    }
+  }
+
+  async function handleSignInspectionCompanyScanConfirm(fields: { companyName: string; companyAddress: string }) {
+    updateFieldValue(signInspectionCoverFieldKeys.companyName, fields.companyName);
+    setSignInspectionPage4State((current) => ({
+      ...current,
+      signName: fields.companyName,
+      address: fields.companyAddress || current.address
+    }));
+    setCompanySearchStatus("searching");
+
+    try {
+      const results = await searchCompanies(fields.companyName);
+      const exactMatch = results.find((company) => company.matchType === "exact");
+      setCompanySearchResults(results);
+      setCompanySearchStatus("idle");
+      if (exactMatch) await handleCompanySelect(exactMatch);
+    } catch (error) {
+      console.error("[Sign inspection company scan search failed]", error);
+      setCompanySearchResults([]);
+      setCompanySearchStatus("error");
+    }
+  }
+
   function updateMapLocation(value: MapLocationValue) {
     setMapLocation(value);
     setMapLocationRevision((current) => current + 1);
@@ -362,20 +793,44 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     : coverYearText.replace(/\D/g, "").slice(0, 2);
   const page17CoverDefaults = useMemo(() => getPage17CoverDefaults(fieldValues), [fieldValues]);
   const pdfFileName = useMemo(() => {
-    if (selectedTemplateId === "maintenance-plan") return "แผนปฏิบัติการตรวจบำรุงรักษาอาคาร.pdf";
+    if (selectedTemplateId !== "annual-inspection") return selectedTemplate.downloadFileName;
     const namePart = getFieldValue("building_name").trim() || coverYearText || "รายงาน";
     return `รายงานตรวจสอบอาคาร-${namePart.replace(/[\\/:*?"<>|]/g, "-")}.pdf`;
-  }, [coverYearText, fieldValues, selectedTemplateId]);
+  }, [coverYearText, fieldValues, selectedTemplate, selectedTemplateId]);
 
   const renderState: ReportRenderState = useMemo(
     () => ({
       templateId: selectedTemplateId,
+      annualAssessmentResult,
       maintenancePlanPage7Checks,
       maintenancePlanPage8Checks,
       maintenancePlanPages9To16Checks,
       maintenancePlanPage18Values,
       maintenancePlanPage19Values,
       maintenancePlanPage19Signature,
+      signMaintenanceForm,
+      signInspectionPage15Choices,
+      signInspectionPage13State,
+      signInspectionPage12State,
+      signInspectionPage9State,
+      signInspectionPage7State,
+      signInspectionPage8State,
+      signInspectionPage4State,
+      mixingWorkshopPage14Checks,
+      mixingWorkshopPage15Checks,
+      mixingWorkshopRemarks,
+      mixingWorkshopPage23Checks,
+      mixingWorkshopPage23Remarks,
+      mixingWorkshopPage24Checks,
+      mixingWorkshopPage24Remarks,
+      mixingWorkshopPage25Checks,
+      mixingWorkshopPage25Remarks,
+      mixingWorkshopPage26Checks,
+      mixingWorkshopPage26Remarks,
+      mixingWorkshopPages27To32Checks,
+      mixingWorkshopPages27To32Remarks,
+      mixingWorkshopPages34To35Choices,
+      mixingWorkshopPages34To35Remarks,
       fieldValues,
       inspectionChecks,
       page14Checks,
@@ -396,12 +851,36 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     }),
     [
       selectedTemplateId,
+      annualAssessmentResult,
       maintenancePlanPage7Checks,
       maintenancePlanPage8Checks,
       maintenancePlanPages9To16Checks,
       maintenancePlanPage18Values,
       maintenancePlanPage19Values,
       maintenancePlanPage19Signature,
+      signMaintenanceForm,
+      signInspectionPage15Choices,
+      signInspectionPage13State,
+      signInspectionPage12State,
+      signInspectionPage9State,
+      signInspectionPage7State,
+      signInspectionPage8State,
+      signInspectionPage4State,
+      mixingWorkshopPage14Checks,
+      mixingWorkshopPage15Checks,
+      mixingWorkshopRemarks,
+      mixingWorkshopPage23Checks,
+      mixingWorkshopPage23Remarks,
+      mixingWorkshopPage24Checks,
+      mixingWorkshopPage24Remarks,
+      mixingWorkshopPage25Checks,
+      mixingWorkshopPage25Remarks,
+      mixingWorkshopPage26Checks,
+      mixingWorkshopPage26Remarks,
+      mixingWorkshopPages27To32Checks,
+      mixingWorkshopPages27To32Remarks,
+      mixingWorkshopPages34To35Choices,
+      mixingWorkshopPages34To35Remarks,
       fieldValues,
       imageEdits,
       inspectionChecks,
@@ -430,6 +909,391 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     setInspectionChecks((current) => ({
       ...current,
       [key]: current[key] === frequency ? null : frequency
+    }));
+  }
+
+  function toggleSignMaintenanceChoice(key: string, choice: Exclude<SignMaintenanceChoice, null>) {
+    setSignMaintenanceForm((current) => ({
+      ...current,
+      choices: {
+        ...current.choices,
+        [key]: current.choices[key] === choice ? null : choice
+      }
+    }));
+  }
+
+  function toggleSignInspectionPage15Choice(
+    key: string,
+    choice: Exclude<SignInspectionPage15Choice, null>
+  ) {
+    setSignInspectionPage15Choices((current) => ({
+      ...current,
+      [key]: current[key] === choice ? null : choice
+    }));
+  }
+
+  function clearSignInspectionPage15() {
+    setSignInspectionPage15Choices(
+      Object.fromEntries(signInspectionPage15Rows.map((row) => [row.key, null]))
+    );
+  }
+
+  function toggleSignInspectionPage13Choice<K extends keyof SignInspectionPage13RowState>(
+    key: string,
+    field: K,
+    choice: Exclude<SignInspectionPage13RowState[K], null>
+  ) {
+    setSignInspectionPage13State((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        [field]: current[key][field] === choice ? null : choice
+      }
+    }));
+  }
+
+  function clearSignInspectionPage13() {
+    setSignInspectionPage13State(Object.fromEntries(signInspectionPage13Rows.map((row) => [
+      row.key,
+      { presence: null, wear: null, damage: null, result: null }
+    ])));
+  }
+
+  function toggleSignInspectionPage12Choice<K extends keyof SignInspectionPage13RowState>(
+    key: string,
+    field: K,
+    choice: Exclude<SignInspectionPage13RowState[K], null>
+  ) {
+    setSignInspectionPage12State((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        [field]: current[key][field] === choice ? null : choice
+      }
+    }));
+  }
+
+  function clearSignInspectionPage12() {
+    setSignInspectionPage12State(Object.fromEntries(signInspectionPage12Rows.map((row) => [
+      row.key,
+      { presence: null, wear: null, damage: null, result: null }
+    ])));
+  }
+
+  function updateSignInspectionPage9Section(
+    key: string,
+    patch: Partial<SignInspectionPage9SectionState>
+  ) {
+    setSignInspectionPage9State((current) => ({
+      ...current,
+      [key]: { ...current[key], ...patch }
+    }));
+  }
+
+  function toggleSignInspectionPage9Change(key: string, choice: Exclude<SignInspectionPage9ChangeChoice, null>) {
+    const currentValue = signInspectionPage9State[key]?.changeChoice ?? null;
+    updateSignInspectionPage9Section(key, { changeChoice: currentValue === choice ? null : choice });
+  }
+
+  function toggleSignInspectionPage9Opinion(key: string, opinion: Exclude<SignInspectionPage9Opinion, null>) {
+    const currentValue = signInspectionPage9State[key]?.opinion ?? null;
+    updateSignInspectionPage9Section(key, { opinion: currentValue === opinion ? null : opinion });
+  }
+
+  function clearSignInspectionPage9() {
+    const pageKeys = new Set(getSignInspectionChangeSectionsForPage(currentTemplatePage).map((section) => section.key));
+    setSignInspectionPage9State((current) => Object.fromEntries(
+      Object.entries(current).map(([key, value]) => [
+        key,
+        pageKeys.has(key) ? structuredClone(defaultSignInspectionPage9State[key]) : value
+      ])
+    ));
+  }
+
+  function toggleSignInspectionPage7Type(key: SignInspectionPage7TypeKey) {
+    setSignInspectionPage7State((current) => ({
+      ...current,
+      signTypes: { ...current.signTypes, [key]: !current.signTypes[key] }
+    }));
+  }
+
+  function updateSignInspectionPage7Group(
+    groupKey: "ground" | "building",
+    patch: Partial<SignInspectionPage7Group>
+  ) {
+    setSignInspectionPage7State((current) => ({
+      ...current,
+      [groupKey]: { ...current[groupKey], ...patch }
+    }));
+  }
+
+  function updateSignInspectionPage7Contact(
+    groupKey: "ground" | "building",
+    contactKey: "signOwner" | "buildingOwner",
+    field: keyof SignInspectionPage7Contact,
+    value: string
+  ) {
+    setSignInspectionPage7State((current) => ({
+      ...current,
+      [groupKey]: {
+        ...current[groupKey],
+        [contactKey]: { ...current[groupKey][contactKey], [field]: value }
+      }
+    }));
+  }
+
+  function fillSignInspectionPage7ContactFromCompany(
+    groupKey: "ground" | "building",
+    contactKey: "signOwner" | "buildingOwner"
+  ) {
+    const savedBuilding = companyHistory?.buildings[0];
+    const companyName = selectedCompanyName.trim()
+      || getFieldValue(signInspectionCoverFieldKeys.companyName).trim();
+    const addressParts = [savedBuilding?.address, savedBuilding?.province, savedBuilding?.postalCode].filter(Boolean);
+    const contact: SignInspectionPage7Contact = {
+      name: companyName,
+      address: addressParts.join(" "),
+      phone: companyHistory?.company.phones[0] ?? savedBuilding?.phone ?? "",
+      fax: savedBuilding?.fax ?? "",
+      email: companyHistory?.company.emails[0] ?? ""
+    };
+    setSignInspectionPage7State((current) => ({
+      ...current,
+      [groupKey]: { ...current[groupKey], [contactKey]: contact }
+    }));
+  }
+
+  function clearSignInspectionPage7() {
+    setSignInspectionPage7State(structuredClone(defaultSignInspectionPage7State));
+  }
+
+  function toggleSignInspectionPage8Material(key: SignInspectionPage8MaterialKey) {
+    setSignInspectionPage8State((current) => ({
+      ...current,
+      materials: { ...current.materials, [key]: !current.materials[key] }
+    }));
+  }
+
+  function updateSignInspectionPage8(patch: Partial<typeof signInspectionPage8State>) {
+    setSignInspectionPage8State((current) => ({ ...current, ...patch }));
+  }
+
+  function toggleSignInspectionPage8OpeningChoice(choice: "yes" | "no") {
+    setSignInspectionPage8State((current) => ({
+      ...current,
+      openingEnabled: true,
+      openingChoice: current.openingChoice === choice ? null : choice
+    }));
+  }
+
+  function clearSignInspectionPage8() {
+    setSignInspectionPage8State(structuredClone(defaultSignInspectionPage8State));
+  }
+
+  function updateSignInspectionPage4(patch: Partial<typeof signInspectionPage4State>) {
+    setSignInspectionPage4State((current) => ({ ...current, ...patch }));
+  }
+
+  function updateSignInspectionPage4MapLocation(value: MapLocationValue) {
+    setSignInspectionPage4State((current) => ({ ...current, mapLocation: value }));
+  }
+
+  function toggleSignInspectionPage4Plan(choice: "has" | "none") {
+    setSignInspectionPage4State((current) => ({
+      ...current,
+      planChoice: current.planChoice === choice ? null : choice
+    }));
+  }
+
+  function toggleSignInspectionPage4Permit(choice: "noData" | "age") {
+    setSignInspectionPage4State((current) => ({
+      ...current,
+      permitChoice: current.permitChoice === choice ? null : choice
+    }));
+  }
+
+  function clearSignInspectionPage4() {
+    setSignInspectionPage4State(structuredClone(defaultSignInspectionPage4State));
+  }
+
+  function toggleCurrentSignInspectionChecklistChoice<K extends keyof SignInspectionPage13RowState>(
+    key: string,
+    field: K,
+    choice: Exclude<SignInspectionPage13RowState[K], null>
+  ) {
+    if (currentTemplatePage === 12) {
+      toggleSignInspectionPage12Choice(key, field, choice);
+      return;
+    }
+    toggleSignInspectionPage13Choice(key, field, choice);
+  }
+
+  function toggleMixingWorkshopPage14Choice(key: string, frequency: MixingWorkshopPage14Frequency) {
+    const setter = currentTemplatePage === 15
+      ? setMixingWorkshopPage15Checks
+      : setMixingWorkshopPage14Checks;
+    setter((current) => ({
+      ...current,
+      [key]: current[key] === frequency ? null : frequency
+    }));
+  }
+
+  function clearMixingWorkshopPage14() {
+    const defaults = currentTemplatePage === 15
+      ? defaultMixingWorkshopPage15Checks
+      : defaultMixingWorkshopPage14Checks;
+    const setter = currentTemplatePage === 15
+      ? setMixingWorkshopPage15Checks
+      : setMixingWorkshopPage14Checks;
+    setter(Object.fromEntries(Object.keys(defaults).map((key) => [key, null])));
+    const pageKeys = new Set(currentMixingWorkshopGroups.flatMap((group) => group.rows.map((row) => row.key)));
+    setMixingWorkshopRemarks((current) => Object.fromEntries(
+      Object.entries(current).map(([key, value]) => [key, pageKeys.has(key) ? "" : value])
+    ));
+  }
+
+  function updateMixingWorkshopRemark(key: string, value: string) {
+    setMixingWorkshopRemarks((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleMixingWorkshopPage24Choice(key: string, frequency: MixingWorkshopPage24Frequency) {
+    if (currentMixingWorkshopExtendedDefinition) {
+      const page = currentMixingWorkshopExtendedDefinition.page;
+      setMixingWorkshopPages27To32Checks((current) => ({
+        ...current,
+        [page]: { ...current[page], [key]: current[page][key] === frequency ? null : frequency }
+      }));
+      return;
+    }
+    const setter = currentTemplatePage === 26
+      ? setMixingWorkshopPage26Checks
+      : currentTemplatePage === 25
+        ? setMixingWorkshopPage25Checks
+        : currentTemplatePage === 23
+          ? setMixingWorkshopPage23Checks
+          : setMixingWorkshopPage24Checks;
+    setter((current) => ({
+      ...current,
+      [key]: current[key] === frequency ? null : frequency
+    }));
+  }
+
+  function updateMixingWorkshopPage24Remark(key: string, value: string) {
+    if (currentMixingWorkshopExtendedDefinition) {
+      const page = currentMixingWorkshopExtendedDefinition.page;
+      setMixingWorkshopPages27To32Remarks((current) => ({
+        ...current,
+        [page]: { ...current[page], [key]: value }
+      }));
+      return;
+    }
+    const setter = currentTemplatePage === 26
+      ? setMixingWorkshopPage26Remarks
+      : currentTemplatePage === 25
+        ? setMixingWorkshopPage25Remarks
+        : currentTemplatePage === 23
+          ? setMixingWorkshopPage23Remarks
+          : setMixingWorkshopPage24Remarks;
+    setter((current) => ({ ...current, [key]: value }));
+  }
+
+  function clearMixingWorkshopPage24() {
+    if (currentMixingWorkshopExtendedDefinition) {
+      const page = currentMixingWorkshopExtendedDefinition.page;
+      setMixingWorkshopPages27To32Checks((current) => ({
+        ...current,
+        [page]: Object.fromEntries(Object.keys(current[page]).map((key) => [key, null]))
+      }));
+      setMixingWorkshopPages27To32Remarks((current) => ({
+        ...current,
+        [page]: { ...defaultMixingWorkshopPages27To32Remarks[page] }
+      }));
+      return;
+    }
+    const defaults = currentTemplatePage === 26
+      ? defaultMixingWorkshopPage26Checks
+      : currentTemplatePage === 25
+        ? defaultMixingWorkshopPage25Checks
+        : currentTemplatePage === 23
+          ? defaultMixingWorkshopPage23Checks
+          : defaultMixingWorkshopPage24Checks;
+    const checkSetter = currentTemplatePage === 26
+      ? setMixingWorkshopPage26Checks
+      : currentTemplatePage === 25
+        ? setMixingWorkshopPage25Checks
+        : currentTemplatePage === 23
+          ? setMixingWorkshopPage23Checks
+          : setMixingWorkshopPage24Checks;
+    const remarkSetter = currentTemplatePage === 26
+      ? setMixingWorkshopPage26Remarks
+      : currentTemplatePage === 25
+        ? setMixingWorkshopPage25Remarks
+        : currentTemplatePage === 23
+          ? setMixingWorkshopPage23Remarks
+          : setMixingWorkshopPage24Remarks;
+    checkSetter(Object.fromEntries(Object.keys(defaults).map((key) => [key, null])));
+    remarkSetter(currentTemplatePage === 26
+      ? { ...defaultMixingWorkshopPage26Remarks }
+      : currentTemplatePage === 25
+        ? { ...defaultMixingWorkshopPage25Remarks }
+        : currentTemplatePage === 23
+          ? { ...defaultMixingWorkshopPage23Remarks }
+          : { ...defaultMixingWorkshopPage24Remarks });
+  }
+
+  function toggleMixingWorkshopSummaryChoice(key: string, choice: Exclude<MixingWorkshopSummaryChoice, null>) {
+    if (!currentMixingWorkshopSummaryDefinition) return;
+    const page = currentMixingWorkshopSummaryDefinition.page;
+    setMixingWorkshopPages34To35Choices((current) => ({
+      ...current,
+      [page]: { ...current[page], [key]: current[page][key] === choice ? null : choice }
+    }));
+  }
+
+  function updateMixingWorkshopSummaryRemark(key: string, value: string) {
+    if (!currentMixingWorkshopSummaryDefinition) return;
+    const page = currentMixingWorkshopSummaryDefinition.page;
+    setMixingWorkshopPages34To35Remarks((current) => ({
+      ...current,
+      [page]: { ...current[page], [key]: value }
+    }));
+  }
+
+  function clearMixingWorkshopSummaryPage() {
+    if (!currentMixingWorkshopSummaryDefinition) return;
+    const page = currentMixingWorkshopSummaryDefinition.page;
+    setMixingWorkshopPages34To35Choices((current) => ({
+      ...current,
+      [page]: Object.fromEntries(Object.keys(current[page]).map((key) => [key, null]))
+    }));
+    setMixingWorkshopPages34To35Remarks((current) => ({
+      ...current,
+      [page]: Object.fromEntries(Object.keys(current[page]).map((key) => [key, ""]))
+    }));
+  }
+
+  function updateSignMaintenanceRemark(key: string, kind: SignMaintenanceRemarkKind, text = "") {
+    setSignMaintenanceForm((current) => ({
+      ...current,
+      remarks: {
+        ...current.remarks,
+        [key]: { kind, text: kind === "text" ? text : "" }
+      }
+    }));
+  }
+
+  function clearSignMaintenancePage() {
+    const pageKeys = new Set(currentSignMaintenanceRows.map((row) => row.key));
+    setSignMaintenanceForm((current) => ({
+      choices: Object.fromEntries(
+        Object.entries(current.choices).map(([key, value]) => [key, pageKeys.has(key) ? null : value])
+      ),
+      remarks: Object.fromEntries(
+        Object.entries(current.remarks).map(([key, value]) => [
+          key,
+          pageKeys.has(key) ? { kind: null, text: "" } : value
+        ])
+      )
     }));
   }
 
@@ -577,9 +1441,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = selectedTemplateId === "maintenance-plan"
-        ? "building-maintenance-plan.pdf"
-        : `TEST-TRUE-${coverYearText}.pdf`;
+      link.download = selectedTemplateId === "annual-inspection"
+        ? `TEST-TRUE-${coverYearText}.pdf`
+        : selectedTemplate.downloadFileName;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -608,7 +1472,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         templateCode: selectedTemplate.code,
         templateName: selectedTemplate.name,
         templatePages: selectedTemplate.pages,
-        inspectionDate: getFieldValue("inspection_date")
+        inspectionDate: getFieldValue("inspection_date"),
+        selectedCompanyId: selectedCompanyId ?? undefined,
+        data: renderState
       });
       setCompletedReportId(savedReport.id);
       setRecipientEmail(getFieldValue("customer_email"));
@@ -669,6 +1535,54 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     }
   }
 
+  function renderSignInspectionPage7Contact(
+    groupKey: "ground" | "building",
+    contactKey: "signOwner" | "buildingOwner",
+    title: string
+  ) {
+    const contact = signInspectionPage7State[groupKey][contactKey];
+    return (
+      <section className="sign-inspection-page7-contact">
+        <div className="sign-inspection-page7-contact-heading">
+          <h4>{title}</h4>
+          <button type="button" onClick={() => fillSignInspectionPage7ContactFromCompany(groupKey, contactKey)}>
+            <Database size={15} aria-hidden="true" /> ใช้ข้อมูลบริษัทเดิม/หน้าปก
+          </button>
+        </div>
+        <div className="form-grid sign-inspection-page7-contact-grid">
+          <label className="field full">
+            <span>ชื่อบริษัทหรือผู้ครอบครอง</span>
+            <input
+              maxLength={120}
+              onChange={(event) => updateSignInspectionPage7Contact(groupKey, contactKey, "name", event.target.value)}
+              value={contact.name}
+            />
+          </label>
+          <label className="field full">
+            <span>ที่อยู่สำหรับติดต่อ</span>
+            <textarea
+              maxLength={260}
+              onChange={(event) => updateSignInspectionPage7Contact(groupKey, contactKey, "address", event.target.value)}
+              rows={2}
+              value={contact.address}
+            />
+          </label>
+          {(["phone", "fax", "email"] as const).map((field) => (
+            <label className="field" key={field}>
+              <span>{field === "phone" ? "โทรศัพท์" : field === "fax" ? "โทรสาร" : "อีเมล"}</span>
+              <input
+                maxLength={field === "email" ? 120 : 40}
+                onChange={(event) => updateSignInspectionPage7Contact(groupKey, contactKey, field, event.target.value)}
+                type={field === "email" ? "email" : "text"}
+                value={contact[field]}
+              />
+            </label>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={isPreviewFullScreen ? "report-builder preview-fullscreen" : "report-builder"}>
       <div className="builder-main">
@@ -723,6 +1637,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
             {currentTemplatePage === 1 ? (
               <section className="builder-card cover-edit-card">
                 <h2>แก้ข้อมูลหน้าแรกของเทมเพลต</h2>
+                <BusinessCardScanner onConfirm={handleBusinessCardConfirm} />
                 <div className="form-grid">
                   <label className="field">
                     <span>ปีรายงาน</span>
@@ -739,13 +1654,57 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                       />
                     </div>
                   </label>
-                  <label className="field full">
-                    <span>ชื่อบริษัทด้านล่างหน้าปก</span>
-                    <input
-                      value={getFieldValue("owner_company")}
-                      onChange={(event) => updateFieldValue("owner_company", event.target.value)}
-                    />
-                  </label>
+                  <div className="field full company-search-field">
+                    <label htmlFor="owner-company-search">ชื่อบริษัทด้านล่างหน้าปก</label>
+                    <div className="company-search-input">
+                      <Search size={17} aria-hidden="true" />
+                      <input
+                        id="owner-company-search"
+                        value={getFieldValue("owner_company")}
+                        onChange={(event) => handleCompanyNameChange(event.target.value)}
+                        placeholder="พิมพ์ชื่อบริษัทเพื่อค้นหาข้อมูลเดิม"
+                        autoComplete="off"
+                        aria-autocomplete="list"
+                        aria-expanded={companySearchResults.length > 0}
+                        aria-controls="company-search-results"
+                      />
+                      {companySearchStatus === "searching" ? <Loader2 className="spin" size={17} aria-label="กำลังค้นหา" /> : null}
+                    </div>
+                    {companySearchResults.length > 0 ? (
+                      <div className="company-search-dropdown" id="company-search-results" role="listbox">
+                        {companySearchResults.map((company) => (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={company.id === selectedCompanyId}
+                            key={company.id}
+                            onClick={() => void handleCompanySelect(company)}
+                          >
+                            <span className="company-result-main">
+                              <strong>{company.name}</strong>
+                              <small>{company.matchType === "exact" ? "ชื่อตรงกับข้อมูลเดิม" : "ชื่อใกล้เคียง"}</small>
+                            </span>
+                            <span className="company-result-meta">
+                              {company.buildingCount} อาคาร · {company.reportCount} รายงาน
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    {companySearchStatus === "idle" && getFieldValue("owner_company").trim() && !selectedCompanyId && companySearchResults.length === 0 ? (
+                      <small className="company-search-hint">ไม่พบบริษัทเดิม ระบบจะสร้างบริษัทใหม่เมื่อบันทึกรายงาน</small>
+                    ) : null}
+                    {companySearchStatus === "error" ? (
+                      <small className="company-search-error">ค้นหาบริษัทไม่สำเร็จ กรุณาตรวจสอบ API แล้วลองใหม่</small>
+                    ) : null}
+                    {selectedCompanyId ? (
+                      <div className="selected-company-chip">
+                        <Database size={15} aria-hidden="true" />
+                        เลือกข้อมูลเดิม: {selectedCompanyName}
+                        <button type="button" onClick={() => handleCompanyNameChange(getFieldValue("owner_company"))}>เปลี่ยน</button>
+                      </div>
+                    ) : null}
+                  </div>
                   <label className="field full">
                     <span>อีเมลลูกค้า (สำหรับส่งรายงาน)</span>
                     <input
@@ -775,6 +1734,111 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                       );
                     })}
                 </div>
+                {companyHistoryStatus === "loading" ? (
+                  <div className="company-history-loading">
+                    <Loader2 className="spin" size={18} aria-hidden="true" />
+                    กำลังดึงข้อมูลเก่าของบริษัท…
+                  </div>
+                ) : null}
+                {companyHistoryStatus === "error" ? (
+                  <p className="company-search-error" role="alert">ไม่สามารถเปิดข้อมูลเก่าของบริษัทได้</p>
+                ) : null}
+                {companyHistory ? (
+                  <div className="company-history-layout">
+                    <section className="company-history-panel existing-data-panel">
+                      <div className="company-history-heading">
+                        <Database size={18} aria-hidden="true" />
+                        <div>
+                          <strong>ข้อมูลเดิมในระบบ</strong>
+                          <span>แสดงเพื่ออ้างอิงเท่านั้น ระบบจะไม่ทับข้อมูลในฟอร์มอัตโนมัติ</span>
+                        </div>
+                      </div>
+                      <dl className="company-master-data">
+                        <div><dt>ชื่อที่เคยบันทึก</dt><dd>{companyHistory.company.names.join(" · ")}</dd></div>
+                        <div>
+                          <dt>อีเมลเดิม</dt>
+                          <dd>
+                            {companyHistory.company.emails.length > 0
+                              ? companyHistory.company.emails.map((email) => (
+                                  <span className="historical-value-action" key={email}>
+                                    {email}
+                                    <button type="button" onClick={() => updateFieldValue("customer_email", email)}>ใช้ค่านี้</button>
+                                  </span>
+                                ))
+                              : "ไม่มีข้อมูล"}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="company-history-section">
+                        <h3><Building2 size={17} aria-hidden="true" /> อาคารเดิม ({companyHistory.buildings.length})</h3>
+                        {companyHistory.buildings.length > 0 ? companyHistory.buildings.map((building) => (
+                          <article className="company-building-history" key={building.id}>
+                            <div>
+                              <strong>{building.name}</strong>
+                              <span>{building.address || "ไม่มีที่อยู่เดิม"}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                updateFieldValue("building_name", building.name);
+                                if (building.address) updateFieldValue("building_address", building.address);
+                              }}
+                            >
+                              ใช้ข้อมูลอาคารนี้
+                            </button>
+                          </article>
+                        )) : <p>ยังไม่มีข้อมูลอาคาร</p>}
+                      </div>
+                      <div className="company-history-section">
+                        <h3>รายงานเดิม ({companyHistory.reports.length})</h3>
+                        {companyHistory.reports.length > 0 ? companyHistory.reports.map((report) => (
+                          <details className="company-report-history" key={report.id}>
+                            <summary>
+                              <span>
+                                <strong>{report.reportNo}</strong>
+                                <small>{report.building} · {report.template}</small>
+                              </span>
+                              <time>{formatHistoryDate(report.updatedAt)}</time>
+                            </summary>
+                            <div className="company-report-history-body">
+                              <p>สถานะ: {report.status} · วันที่ตรวจ: {report.inspectionDate || "ไม่ระบุ"}</p>
+                              {report.data ? (
+                                <details>
+                                  <summary>ดูข้อมูลแบบฟอร์มเดิมทั้งหมด</summary>
+                                  <pre>{JSON.stringify(report.data, null, 2)}</pre>
+                                </details>
+                              ) : (
+                                <p className="legacy-data-note">รายงานนี้สร้างก่อนระบบเก็บรายละเอียดแบบฟอร์ม จึงมีเฉพาะข้อมูลสรุปด้านบน</p>
+                              )}
+                            </div>
+                          </details>
+                        )) : <p>ยังไม่มีรายงานเดิม</p>}
+                      </div>
+                    </section>
+                    <section className="company-history-panel new-data-panel">
+                      <div className="company-history-heading">
+                        <FileText size={18} aria-hidden="true" />
+                        <div>
+                          <strong>ข้อมูลใหม่ในฟอร์มนี้</strong>
+                          <span>ยังไม่บันทึก และแยกจากข้อมูลเดิมอย่างชัดเจน</span>
+                        </div>
+                      </div>
+                      <dl className="company-current-data">
+                        {[
+                          ["ชื่อบริษัท", getFieldValue("owner_company")],
+                          ["อีเมลลูกค้า", getFieldValue("customer_email")],
+                          ["ชื่ออาคาร", getFieldValue("building_name")],
+                          ["ที่อยู่อาคาร", getFieldValue("building_address")]
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value || "ยังไม่กรอก"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </section>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -1094,11 +2158,42 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </section>
             ) : null}
 
-            {currentTemplatePage === 26 ? (
+            {selectedTemplateId === "annual-inspection" && currentTemplatePage === 26 ? (
   <section className="builder-card page25-edit-card">
     <span className="page-kicker">หน้า 26</span>
-    <h2>ลายเซ็นและวันที่</h2>
-    <p>หากเว้นว่าง ระบบจะคงข้อความเดิมจาก Template ไว้</p>
+    <h2>ผลประเมินและลายเซ็น</h2>
+    <p>เลือกผลการตรวจสอบเพื่อให้ระบบสร้างหน้าสรุปที่ตรงกับผลประเมิน โดยไม่เปลี่ยนหัวและท้ายกระดาษของ Template</p>
+
+    <fieldset className="annual-assessment-section">
+      <legend>ผลการตรวจสอบอาคาร</legend>
+      <div className="annual-assessment-options">
+        <label className={`annual-assessment-option annual-assessment-pass${annualAssessmentResult === "pass" ? " is-selected" : ""}`}>
+          <input
+            type="radio"
+            name="annual-assessment-result"
+            checked={annualAssessmentResult === "pass"}
+            onChange={() => setAnnualAssessmentResult("pass")}
+          />
+          <span><strong>ผ่าน</strong><small>สร้างหน้าสรุปผลรับรองว่าอาคารผ่านการตรวจสอบ</small></span>
+        </label>
+        <label className={`annual-assessment-option annual-assessment-fail${annualAssessmentResult === "fail" ? " is-selected" : ""}`}>
+          <input
+            type="radio"
+            name="annual-assessment-result"
+            checked={annualAssessmentResult === "fail"}
+            onChange={() => setAnnualAssessmentResult("fail")}
+          />
+          <span><strong>ไม่ผ่าน</strong><small>สร้างหน้าสรุปข้อบกพร่องและกำหนดให้ดำเนินการแก้ไข</small></span>
+        </label>
+      </div>
+      {annualAssessmentResult ? (
+        <p className={`annual-assessment-status ${annualAssessmentResult}`}>
+          หน้าสรุปปัจจุบัน: {annualAssessmentResult === "pass" ? "ผ่านการตรวจสอบ" : "ไม่ผ่านการตรวจสอบ"}
+        </p>
+      ) : (
+        <p className="annual-assessment-status pending">กรุณาเลือก “ผ่าน” หรือ “ไม่ผ่าน”</p>
+      )}
+    </fieldset>
 
     <fieldset className="page25-signature-section">
       <legend>ผู้ตรวจสอบอาคาร</legend>
@@ -1365,7 +2460,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 7 ? (
           <section className="builder-card checklist-card maintenance-page7-card">
             <div className="checklist-header">
-              <span>หน้า 7</span>
+              <span>หน้า {currentTemplatePage}</span>
               <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
               <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
             </div>
@@ -1398,7 +2493,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 8 ? (
           <section className="builder-card checklist-card maintenance-page8-card">
             <div className="checklist-header">
-              <span>หน้า 8</span>
+              <span>หน้า {currentTemplatePage}</span>
               <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
               <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
             </div>
@@ -1498,7 +2593,11 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                         aria-label={`${item.number} ใช้ได้`}
                         checked={value.status === "usable"}
                         name={`maintenance-page${currentTemplatePage}-${item.key}`}
-                        onChange={() => toggleMaintenancePlanSummaryStatus(currentTemplatePage, item.key, "usable")}
+                        onChange={() => toggleMaintenancePlanSummaryStatus(
+                          currentTemplatePage,
+                          item.key,
+                          "usable"
+                        )}
                         type="checkbox"
                       />
                     </div>
@@ -1507,7 +2606,11 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                         aria-label={`${item.number} ใช้ไม่ได้`}
                         checked={value.status === "unusable"}
                         name={`maintenance-page${currentTemplatePage}-${item.key}`}
-                        onChange={() => toggleMaintenancePlanSummaryStatus(currentTemplatePage, item.key, "unusable")}
+                        onChange={() => toggleMaintenancePlanSummaryStatus(
+                          currentTemplatePage,
+                          item.key,
+                          "unusable"
+                        )}
                         type="checkbox"
                       />
                     </div>
@@ -1584,11 +2687,904 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </fieldset>
             ) : null}
           </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && currentTemplatePage === 14 ? (
+          <section className="builder-card template-readonly-card">
+            <FileText size={24} aria-hidden="true" />
+            <div>
+              <span className="page-kicker">หน้า 14 / 35</span>
+              <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
+              <p>หน้านี้ใช้ช่วงเวลาและความถี่ในการตรวจสอบตาม Template เดิม และไม่เปิดให้แก้ไขข้อมูล</p>
+            </div>
+          </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && currentTemplatePage === 15 ? (
+          <section className="builder-card template-readonly-card">
+            <FileText size={24} aria-hidden="true" />
+            <div>
+              <span className="page-kicker">หน้า 15 / 35</span>
+              <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
+              <p>หน้านี้ใช้ช่วงเวลาและความถี่ในการตรวจสอบตาม Template เดิม และลบวันที่ด้านล่างออกแล้ว</p>
+            </div>
+          </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && ((currentTemplatePage >= 23 && currentTemplatePage <= 32)) ? (
+          <section className="builder-card template-readonly-card">
+            <FileText size={24} aria-hidden="true" />
+            <div>
+              <span className="page-kicker">หน้า {currentTemplatePage} / 35</span>
+              <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
+              <p>หน้านี้ใช้ตารางและค่าตรวจบำรุงรักษาตาม Template เดิม และไม่เปิดให้แก้ไขข้อมูล</p>
+            </div>
+          </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && currentMixingWorkshopSummaryDefinition ? (
+          <section className="builder-card mixing-page14-form-card">
+            <div className="mixing-page14-form-heading">
+              <div>
+                <span>หน้า {currentTemplatePage} / 35</span>
+                <h2>{currentMixingWorkshopSummaryDefinition.title}</h2>
+                <p>เลือกผลตรวจและกรอกหมายเหตุจากตารางด้านซ้าย ระบบจะแสดงผลบน PDF ด้านขวาทันที</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label={`เครื่องมือหน้า ${currentTemplatePage}`}>
+                <button onClick={clearMixingWorkshopSummaryPage} type="button">
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <div className="mixing-page14-table-list">
+              {currentMixingWorkshopSummaryDefinition.groups.map((group) => (
+                <section className="mixing-page14-table-section" key={group.title}>
+                  <h3>{group.title}</h3>
+                  <div className="mixing-page14-table-wrap">
+                    <table className="mixing-page14-table mixing-summary-table">
+                      <colgroup>
+                        <col className="mixing-summary-item-col" />
+                        {mixingWorkshopSummaryOptions.map((option) => <col className="mixing-summary-choice-col" key={option.key} />)}
+                        <col className="mixing-summary-remark-col" />
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th scope="col">รายการตรวจสอบ</th>
+                          {mixingWorkshopSummaryOptions.map((option) => <th key={option.key} scope="col">{option.label}</th>)}
+                          <th scope="col">หมายเหตุ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => (
+                          <tr key={row.key}>
+                            <th scope="row">{row.label}</th>
+                            {mixingWorkshopSummaryOptions.map((option) => (
+                              <td data-label={option.label} key={option.key}>
+                                <input
+                                  aria-label={`${row.label} ${option.label}`}
+                                  checked={currentMixingWorkshopSummaryChoices[row.key] === option.key}
+                                  onChange={() => toggleMixingWorkshopSummaryChoice(row.key, option.key)}
+                                  type="checkbox"
+                                />
+                              </td>
+                            ))}
+                            <td className="mixing-page14-remark-cell" data-label="หมายเหตุ">
+                              <input
+                                aria-label={`หมายเหตุ ${row.label}`}
+                                maxLength={120}
+                                onChange={(event) => updateMixingWorkshopSummaryRemark(row.key, event.target.value)}
+                                placeholder="กรอกหมายเหตุ"
+                                type="text"
+                                value={currentMixingWorkshopSummaryRemarks[row.key] ?? ""}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 2 ? (
+          <section className="builder-card sign-inspection-cover-form">
+            <div className="image-upload-header">
+              <div>
+                <span className="page-kicker">หน้าปก - หน้า 2 / 15</span>
+                <h2>แก้ไขข้อมูลหน้าปกรายงานตรวจสอบป้าย</h2>
+                <p>ข้อมูลและรูปภาพที่แก้ไขจะแสดงใน PDF ด้านขวาทันที</p>
+              </div>
+            </div>
+
+            <BusinessCardScanner onConfirm={handleSignInspectionCompanyScanConfirm} />
+
+            <div className="form-grid sign-inspection-cover-fields">
+              <label className="field sign-inspection-cover-year-field">
+                <span>ปีรายงาน</span>
+                <span className="year-input">
+                  <strong>25</strong>
+                  <input
+                    aria-label="ตัวเลขปีรายงานต่อท้าย 25"
+                    inputMode="numeric"
+                    maxLength={2}
+                    value={getFieldValue(signInspectionCoverFieldKeys.yearSuffix)}
+                    onChange={(event) => updateFieldValue(
+                      signInspectionCoverFieldKeys.yearSuffix,
+                      event.target.value.replace(/\D/g, "").slice(0, 2)
+                    )}
+                  />
+                </span>
+              </label>
+              <label className="field">
+                <span>ชื่อบริษัทบนหน้าปก</span>
+                <input
+                  maxLength={100}
+                  value={getFieldValue(signInspectionCoverFieldKeys.companyName)}
+                  onChange={(event) => updateFieldValue(signInspectionCoverFieldKeys.companyName, event.target.value)}
+                />
+              </label>
+              <label className="field full sign-inspection-cover-description-field">
+                <span>ข้อความประเภทและขนาดป้ายใต้รูป</span>
+                <textarea
+                  maxLength={220}
+                  rows={3}
+                  value={getFieldValue(signInspectionCoverFieldKeys.description)}
+                  onChange={(event) => updateFieldValue(signInspectionCoverFieldKeys.description, event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="upload-grid sign-inspection-cover-upload-grid">
+              <ImageSlot
+                edit={imageEdits[signInspectionCoverImageSlot.key]}
+                onReplace={handleReplaceImage}
+                slot={signInspectionCoverImageSlot}
+              />
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 4 ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page7-form sign-inspection-page4-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า 4 / 15</span>
+                <h2>ข้อมูลป้าย ใบอนุญาต และตำแหน่งแผนที่</h2>
+                <p>กรอกข้อมูลจากฟอร์มด้านซ้าย เลือก Checkbox และอัปโหลดหรือถ่ายรูปแผนที่ ข้อมูลจะอัปเดตลง PDF ทันที</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือหน้า 4">
+                <button onClick={clearSignInspectionPage4} type="button"><Eraser size={16} aria-hidden="true" /> ล้างค่า</button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <section className="sign-inspection-page7-group-card">
+              <h3>1. ข้อมูลป้ายและสถานที่ตั้งป้าย</h3>
+              <div className="form-grid sign-inspection-page4-fields">
+                <label className="field full">
+                  <span>ชื่อป้าย</span>
+                  <input maxLength={120} onChange={(event) => updateSignInspectionPage4({ signName: event.target.value })} value={signInspectionPage4State.signName} />
+                </label>
+                <label className="field full">
+                  <span>ที่อยู่สถานที่ตั้งป้าย</span>
+                  <textarea maxLength={300} onChange={(event) => updateSignInspectionPage4({ address: event.target.value })} rows={3} value={signInspectionPage4State.address} />
+                </label>
+                <label className="field">
+                  <span>โทรศัพท์</span>
+                  <input maxLength={40} onChange={(event) => updateSignInspectionPage4({ phone: event.target.value })} value={signInspectionPage4State.phone} />
+                </label>
+                <label className="field">
+                  <span>โทรสาร</span>
+                  <input maxLength={40} onChange={(event) => updateSignInspectionPage4({ fax: event.target.value })} value={signInspectionPage4State.fax} />
+                </label>
+              </div>
+            </section>
+
+            <section className="sign-inspection-page7-group-card">
+              <h3>ข้อมูลใบอนุญาตก่อสร้าง</h3>
+              <div className="form-grid sign-inspection-page4-permit-fields">
+                <label className="field full">
+                  <span>ได้รับใบอนุญาตก่อสร้างจาก</span>
+                  <input maxLength={160} onChange={(event) => updateSignInspectionPage4({ permitAuthority: event.target.value })} value={signInspectionPage4State.permitAuthority} />
+                </label>
+                <label className="field">
+                  <span>วันที่</span>
+                  <input inputMode="numeric" maxLength={2} onChange={(event) => updateSignInspectionPage4({ permitDay: event.target.value.replace(/\D/g, "") })} value={signInspectionPage4State.permitDay} />
+                </label>
+                <label className="field">
+                  <span>เดือน</span>
+                  <input maxLength={30} onChange={(event) => updateSignInspectionPage4({ permitMonth: event.target.value })} value={signInspectionPage4State.permitMonth} />
+                </label>
+                <label className="field">
+                  <span>พ.ศ.</span>
+                  <input inputMode="numeric" maxLength={4} onChange={(event) => updateSignInspectionPage4({ permitYear: event.target.value.replace(/\D/g, "") })} value={signInspectionPage4State.permitYear} />
+                </label>
+              </div>
+            </section>
+
+            <section className="sign-inspection-page7-type-card">
+              <h3>ข้อมูลแบบแปลนเดิม</h3>
+              <div className="sign-inspection-page7-type-grid">
+                <label><input checked={signInspectionPage4State.planChoice === "has"} onChange={() => toggleSignInspectionPage4Plan("has")} type="checkbox" /><span>มีแบบแปลนเดิม</span></label>
+                <label><input checked={signInspectionPage4State.planChoice === "none"} onChange={() => toggleSignInspectionPage4Plan("none")} type="checkbox" /><span>ไม่มีแบบแปลนเดิม</span></label>
+              </div>
+            </section>
+
+            <section className="sign-inspection-page7-type-card">
+              <h3>ข้อมูลใบอนุญาตและอายุของป้าย</h3>
+              <div className="sign-inspection-page7-type-grid">
+                <label><input checked={signInspectionPage4State.permitChoice === "noData"} onChange={() => toggleSignInspectionPage4Permit("noData")} type="checkbox" /><span>ไม่มีข้อมูลการได้รับใบอนุญาตก่อสร้างจากเจ้าพนักงานท้องถิ่น</span></label>
+                <label><input checked={signInspectionPage4State.permitChoice === "age"} onChange={() => toggleSignInspectionPage4Permit("age")} type="checkbox" /><span>ระบุอายุของป้าย</span></label>
+              </div>
+              {signInspectionPage4State.permitChoice === "age" ? (
+                <label className="field sign-inspection-page4-age-field">
+                  <span>อายุของป้ายประมาณ (เดือน)</span>
+                  <input inputMode="numeric" maxLength={5} onChange={(event) => updateSignInspectionPage4({ signAgeMonths: event.target.value.replace(/\D/g, "") })} value={signInspectionPage4State.signAgeMonths} />
+                </label>
+              ) : null}
+            </section>
+
+            <section className="sign-inspection-page7-group-card sign-inspection-page4-map-card">
+              <MapLocationField
+                description="กรอกลิงก์ Google Maps และพิกัด GPS หรืออัปโหลดภาพแผนที่จากการแคปหน้าจอ"
+                onChange={updateSignInspectionPage4MapLocation}
+                pageLabel="หน้า 4"
+                showCoordinates
+                title="ลิงก์ Google Maps พิกัด GPS และรูปแผนที่"
+                value={signInspectionPage4State.mapLocation}
+              />
+              <div className="upload-grid sign-inspection-page14-upload-grid">
+                <ImageSlot edit={imageEdits[signInspectionPage4MapSlot.key]} onReplace={handleReplaceImage} slot={signInspectionPage4MapSlot} />
+              </div>
+              <p className="sign-inspection-page4-logo-note">โลโก้ SHERA ถูกลบออกจากแผนที่ใน PDF โดยอัตโนมัติ</p>
+            </section>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 7 ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page7-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า 7 / 15</span>
+                <h2>ข้อมูลทั่วไปและผู้เกี่ยวข้องของป้าย</h2>
+                <p>เลือกประเภทป้ายก่อน ระบบจะแสดงเฉพาะชุดข้อมูลที่เกี่ยวข้องและอัปเดตลง PDF ทันที</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือหน้า 7">
+                <button onClick={clearSignInspectionPage7} type="button">
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <section className="sign-inspection-page7-type-card">
+              <h3>2. ประเภทของป้าย</h3>
+              <div className="sign-inspection-page7-type-grid">
+                {signInspectionPage7TypeOptions.map((option) => (
+                  <label key={option.key}>
+                    <input
+                      checked={signInspectionPage7State.signTypes[option.key]}
+                      onChange={() => toggleSignInspectionPage7Type(option.key)}
+                      type="checkbox"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+              {signInspectionPage7State.signTypes.other ? (
+                <label className="field sign-inspection-page7-other-field">
+                  <span>ระบุประเภทป้ายอื่น ๆ</span>
+                  <input
+                    maxLength={100}
+                    onChange={(event) => setSignInspectionPage7State((current) => ({
+                      ...current,
+                      otherTypeText: event.target.value
+                    }))}
+                    value={signInspectionPage7State.otherTypeText}
+                  />
+                </label>
+              ) : null}
+            </section>
+
+            {!Object.values(signInspectionPage7State.signTypes).some(Boolean) ? (
+              <p className="sign-inspection-page7-empty">เลือกประเภทป้ายอย่างน้อย 1 รายการเพื่อแสดงฟอร์มข้อมูล</p>
+            ) : null}
+
+            {signInspectionPage7State.signTypes.ground ? (
+              <section className="sign-inspection-page7-group-card">
+                <h3>ป้ายที่ติดตั้งบนพื้นดิน</h3>
+                <label className="field full">
+                  <span>ชื่อผลิตภัณฑ์โฆษณาหรือข้อความในป้าย</span>
+                  <textarea
+                    maxLength={240}
+                    onChange={(event) => updateSignInspectionPage7Group("ground", { productText: event.target.value })}
+                    rows={3}
+                    value={signInspectionPage7State.ground.productText}
+                  />
+                </label>
+                {renderSignInspectionPage7Contact("ground", "signOwner", "เจ้าของหรือผู้ครอบครองป้าย")}
+                <div className="form-grid sign-inspection-page7-engineer-grid">
+                  <label className="field">
+                    <span>ชื่อผู้ออกแบบด้านวิศวกรรมโครงสร้าง</span>
+                    <input
+                      maxLength={120}
+                      onChange={(event) => updateSignInspectionPage7Group("ground", { engineerName: event.target.value })}
+                      value={signInspectionPage7State.ground.engineerName}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>เลขใบอนุญาต</span>
+                    <input
+                      maxLength={80}
+                      onChange={(event) => updateSignInspectionPage7Group("ground", { engineerLicense: event.target.value })}
+                      value={signInspectionPage7State.ground.engineerLicense}
+                    />
+                  </label>
+                </div>
+              </section>
+            ) : null}
+
+            {hasBuildingMountedSign(signInspectionPage7State) ? (
+              <section className="sign-inspection-page7-group-card">
+                <h3>ป้ายบนอาคาร หลังคา ดาดฟ้า หรือส่วนอื่นของอาคาร</h3>
+                <label className="field full">
+                  <span>ชื่อผลิตภัณฑ์โฆษณาหรือข้อความในป้าย</span>
+                  <textarea
+                    maxLength={200}
+                    onChange={(event) => updateSignInspectionPage7Group("building", { productText: event.target.value })}
+                    rows={2}
+                    value={signInspectionPage7State.building.productText}
+                  />
+                </label>
+                {renderSignInspectionPage7Contact("building", "signOwner", "เจ้าของหรือผู้ครอบครองป้าย")}
+                {renderSignInspectionPage7Contact("building", "buildingOwner", "เจ้าของหรือผู้ครอบครองอาคารที่ป้ายตั้งอยู่")}
+                <div className="form-grid sign-inspection-page7-engineer-grid">
+                  <label className="field">
+                    <span>ชื่อผู้ออกแบบด้านวิศวกรรมโครงสร้าง</span>
+                    <input
+                      maxLength={120}
+                      onChange={(event) => updateSignInspectionPage7Group("building", { engineerName: event.target.value })}
+                      value={signInspectionPage7State.building.engineerName}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>เลขใบอนุญาต</span>
+                    <input
+                      maxLength={80}
+                      onChange={(event) => updateSignInspectionPage7Group("building", { engineerLicense: event.target.value })}
+                      value={signInspectionPage7State.building.engineerLicense}
+                    />
+                  </label>
+                </div>
+              </section>
+            ) : null}
+
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 8 ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page7-form sign-inspection-page8-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า 8 / 15</span>
+                <h2>ประเภทวัสดุและรายละเอียดของแผ่นป้าย</h2>
+                <p>เลือก Checkbox และกรอกข้อความจากฟอร์มด้านซ้าย ข้อมูลจะอัปเดตลง PDF ทันที และเปลี่ยนหรือถ่ายรูปใหม่ได้ทั้ง 4 ช่อง</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือหน้า 8">
+                <button onClick={clearSignInspectionPage8} type="button"><Eraser size={16} aria-hidden="true" /> ล้างค่า</button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <section className="sign-inspection-page7-type-card">
+              <h3>4.1 ประเภทวัสดุของสิ่งที่สร้างขึ้นสำหรับติดหรือตั้งป้าย</h3>
+              <div className="sign-inspection-page7-type-grid">
+                {signInspectionPage8MaterialOptions.map((option) => (
+                  <label key={option.key}>
+                    <input checked={signInspectionPage8State.materials[option.key]} onChange={() => toggleSignInspectionPage8Material(option.key)} type="checkbox" />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+              {signInspectionPage8State.materials.other ? (
+                <label className="field sign-inspection-page7-other-field">
+                  <span>ระบุวัสดุอื่น ๆ</span>
+                  <input maxLength={160} onChange={(event) => updateSignInspectionPage8({ otherMaterialText: event.target.value })} value={signInspectionPage8State.otherMaterialText} />
+                </label>
+              ) : null}
+            </section>
+
+            <section className="sign-inspection-page7-group-card sign-inspection-page8-usage-card">
+              <h3>4.2 ลักษณะการใช้งานหรือการประกอบกิจกรรมของอาคาร</h3>
+              <div className="sign-inspection-page8-usage-list">
+                <div className="sign-inspection-page8-usage-row">
+                  <label className="sign-inspection-page8-check-label">
+                    <input checked={signInspectionPage8State.signMaterialEnabled} onChange={() => updateSignInspectionPage8({ signMaterialEnabled: !signInspectionPage8State.signMaterialEnabled })} type="checkbox" />
+                    <span>วัสดุของป้าย (โปรดระบุ)</span>
+                  </label>
+                  <input aria-label="ระบุวัสดุของป้าย" disabled={!signInspectionPage8State.signMaterialEnabled} maxLength={160} onChange={(event) => updateSignInspectionPage8({ signMaterialText: event.target.value })} placeholder="กรอกวัสดุของป้าย" value={signInspectionPage8State.signMaterialText} />
+                </div>
+                <div className="sign-inspection-page8-usage-row">
+                  <label className="sign-inspection-page8-check-label">
+                    <input checked={signInspectionPage8State.sideCountEnabled} onChange={() => updateSignInspectionPage8({ sideCountEnabled: !signInspectionPage8State.sideCountEnabled })} type="checkbox" />
+                    <span>จำนวนด้านที่ติดป้าย</span>
+                  </label>
+                  <input aria-label="จำนวนด้านที่ติดป้าย" disabled={!signInspectionPage8State.sideCountEnabled} inputMode="numeric" maxLength={12} onChange={(event) => updateSignInspectionPage8({ sideCount: event.target.value.replace(/[^0-9.]/g, "") })} placeholder="กรอกจำนวนด้าน" value={signInspectionPage8State.sideCount} />
+                </div>
+                <div className="sign-inspection-page8-opening-row">
+                  <label className="sign-inspection-page8-check-label">
+                    <input checked={signInspectionPage8State.openingEnabled} onChange={() => updateSignInspectionPage8({ openingEnabled: !signInspectionPage8State.openingEnabled, openingChoice: signInspectionPage8State.openingEnabled ? null : signInspectionPage8State.openingChoice })} type="checkbox" />
+                    <span>การเจาะช่องเปิดในป้าย</span>
+                  </label>
+                  <div className="sign-inspection-page8-inline-choices">
+                    {(["yes", "no"] as const).map((choice) => (
+                      <label key={choice}>
+                        <input checked={signInspectionPage8State.openingChoice === choice} disabled={!signInspectionPage8State.openingEnabled} onChange={() => toggleSignInspectionPage8OpeningChoice(choice)} type="checkbox" />
+                        <span>{choice === "yes" ? "มี" : "ไม่มี"}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="sign-inspection-page8-usage-row">
+                  <label className="sign-inspection-page8-check-label">
+                    <input checked={signInspectionPage8State.otherUsageEnabled} onChange={() => updateSignInspectionPage8({ otherUsageEnabled: !signInspectionPage8State.otherUsageEnabled })} type="checkbox" />
+                    <span>อื่น ๆ (โปรดระบุ)</span>
+                  </label>
+                  <input aria-label="ระบุลักษณะการใช้งานอื่น ๆ" disabled={!signInspectionPage8State.otherUsageEnabled} maxLength={160} onChange={(event) => updateSignInspectionPage8({ otherUsageText: event.target.value })} placeholder="กรอกข้อความเพิ่มเติม" value={signInspectionPage8State.otherUsageText} />
+                </div>
+              </div>
+            </section>
+
+            <section className="sign-inspection-page7-group-card">
+              <h3>รูปภาพประกอบหน้า 8</h3>
+              <div className="upload-grid sign-inspection-page14-upload-grid">
+                {signInspectionPage8ImageSlots.map((slot) => (
+                  <ImageSlot edit={imageEdits[slot.key]} key={slot.key} onReplace={handleReplaceImage} slot={slot} />
+                ))}
+              </div>
+            </section>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && [9, 10, 11].includes(currentTemplatePage) ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page9-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า {currentTemplatePage} / 15</span>
+                <h2>ผลการตรวจสอบการเปลี่ยนแปลงป้าย</h2>
+                <p>เลือกผลตรวจและกรอกรายละเอียดทางด้านซ้าย ระบบจะแสดง ✓ และข้อความลงใน PDF ด้านขวาทันที</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label={`เครื่องมือหน้า ${currentTemplatePage}`}>
+                <button onClick={clearSignInspectionPage9} type="button">
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <div className="sign-inspection-page9-sections">
+              {getSignInspectionChangeSectionsForPage(currentTemplatePage).map((section) => {
+                const value = signInspectionPage9State[section.key] ?? defaultSignInspectionPage9State[section.key];
+                return (
+                  <section className="sign-inspection-page9-section" key={section.key}>
+                    <h3>{section.title}</h3>
+
+                    <fieldset className="sign-inspection-page9-choice-group">
+                      <legend>การเปลี่ยนแปลง</legend>
+                      <label>
+                        <input
+                          checked={value.changeChoice === "none"}
+                          onChange={() => toggleSignInspectionPage9Change(section.key, "none")}
+                          type="checkbox"
+                        />
+                        <span>{section.noneLabel}</span>
+                      </label>
+                      <label>
+                        <input
+                          checked={value.changeChoice === "changed"}
+                          onChange={() => toggleSignInspectionPage9Change(section.key, "changed")}
+                          type="checkbox"
+                        />
+                        <span>{section.changedLabel}</span>
+                      </label>
+                    </fieldset>
+
+                    {value.changeChoice === "changed" ? (
+                      <label className="field sign-inspection-page9-textarea">
+                        <span>รายละเอียดการเปลี่ยนแปลง</span>
+                        <textarea
+                          maxLength={220}
+                          onChange={(event) => updateSignInspectionPage9Section(section.key, { changeDetails: event.target.value })}
+                          placeholder="กรอกรายละเอียดที่ตรวจพบ"
+                          rows={3}
+                          value={value.changeDetails}
+                        />
+                      </label>
+                    ) : null}
+
+                    <fieldset className="sign-inspection-page9-choice-group compact">
+                      <legend>ความเห็นของผู้ตรวจสอบ</legend>
+                      <label>
+                        <input
+                          checked={value.opinion === "usable"}
+                          onChange={() => toggleSignInspectionPage9Opinion(section.key, "usable")}
+                          type="checkbox"
+                        />
+                        <span>ใช้ได้</span>
+                      </label>
+                      <label>
+                        <input
+                          checked={value.opinion === "unusable"}
+                          onChange={() => toggleSignInspectionPage9Opinion(section.key, "unusable")}
+                          type="checkbox"
+                        />
+                        <span>ใช้ไม่ได้</span>
+                      </label>
+                    </fieldset>
+
+                    <label className="field sign-inspection-page9-textarea">
+                      <span>รายละเอียดความเห็นเพิ่มเติม</span>
+                      <textarea
+                        maxLength={220}
+                        onChange={(event) => updateSignInspectionPage9Section(section.key, { opinionDetails: event.target.value })}
+                        placeholder="กรอกเพิ่มเติมได้ (ถ้ามี)"
+                        rows={3}
+                        value={value.opinionDetails}
+                      />
+                    </label>
+
+                    <label className="sign-inspection-page9-other-toggle">
+                      <input
+                        checked={value.otherEnabled}
+                        onChange={() => updateSignInspectionPage9Section(section.key, { otherEnabled: !value.otherEnabled })}
+                        type="checkbox"
+                      />
+                      <span>อื่น ๆ (โปรดระบุ)</span>
+                    </label>
+                    {value.otherEnabled ? (
+                      <label className="field sign-inspection-page9-textarea">
+                        <span>รายละเอียดอื่น ๆ</span>
+                        <textarea
+                          maxLength={260}
+                          onChange={(event) => updateSignInspectionPage9Section(section.key, { otherText: event.target.value })}
+                          placeholder="กรอกรายละเอียดอื่น ๆ"
+                          rows={4}
+                          value={value.otherText}
+                        />
+                      </label>
+                    ) : null}
+                  </section>
+                );
+              })}
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && (currentTemplatePage === 12 || currentTemplatePage === 13) ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page13-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า {currentTemplatePage} / 15</span>
+                <h2>การตรวจสอบอุปกรณ์ประกอบต่าง ๆ ของป้าย</h2>
+                <p>เลือก Checkbox ตามผลตรวจ ระบบจะแสดง ✓ ใน PDF ด้านขวาทันที โดยแต่ละกลุ่มเลือกได้หนึ่งค่า</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือหน้า 13">
+                <button onClick={currentTemplatePage === 12 ? clearSignInspectionPage12 : clearSignInspectionPage13} type="button">
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <div className="sign-maintenance-table-list">
+              {(currentTemplatePage === 12 ? signInspectionPage12Groups : signInspectionPage13Groups).map((group) => (
+                <section className="sign-maintenance-table-section" key={group.title}>
+                  <h3>{group.title}</h3>
+                  <div className="sign-maintenance-table-wrap">
+                    <table className="sign-maintenance-table sign-inspection-page13-table">
+                      <thead>
+                        <tr>
+                          <th className="item-column" rowSpan={2} scope="col">รายการตรวจสอบ</th>
+                          <th colSpan={2} scope="colgroup">รายการ</th>
+                          <th colSpan={2} scope="colgroup">การชำรุดสึกหรอ</th>
+                          <th colSpan={2} scope="colgroup">ความเสียหาย</th>
+                          <th colSpan={2} scope="colgroup">ความเห็นผู้ตรวจสอบ</th>
+                        </tr>
+                        <tr>
+                          <th scope="col">มี</th><th scope="col">ไม่มี</th>
+                          <th scope="col">มี</th><th scope="col">ไม่มี</th>
+                          <th scope="col">มี</th><th scope="col">ไม่มี</th>
+                          <th scope="col">ใช้ได้</th><th scope="col">ใช้ไม่ได้</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.rows.map((row) => {
+                          const value = currentTemplatePage === 12
+                            ? signInspectionPage12State[row.key]
+                            : signInspectionPage13State[row.key];
+                          return (
+                            <tr key={row.key}>
+                              <th className="sign-maintenance-item" scope="row">{row.label}</th>
+                              {(["yes", "no"] as const).map((choice) => (
+                                <td className="sign-maintenance-checkbox-cell" data-label={`รายการ ${choice === "yes" ? "มี" : "ไม่มี"}`} key={`presence-${choice}`}>
+                                  <input aria-label={`${row.label} รายการ ${choice === "yes" ? "มี" : "ไม่มี"}`} checked={value.presence === choice} onChange={() => toggleCurrentSignInspectionChecklistChoice(row.key, "presence", choice)} type="checkbox" />
+                                </td>
+                              ))}
+                              {(["yes", "no"] as const).map((choice) => (
+                                <td className="sign-maintenance-checkbox-cell" data-label={`ชำรุด ${choice === "yes" ? "มี" : "ไม่มี"}`} key={`wear-${choice}`}>
+                                  <input aria-label={`${row.label} ชำรุด ${choice === "yes" ? "มี" : "ไม่มี"}`} checked={value.wear === choice} onChange={() => toggleCurrentSignInspectionChecklistChoice(row.key, "wear", choice)} type="checkbox" />
+                                </td>
+                              ))}
+                              {(["yes", "no"] as const).map((choice) => (
+                                <td className="sign-maintenance-checkbox-cell" data-label={`เสียหาย ${choice === "yes" ? "มี" : "ไม่มี"}`} key={`damage-${choice}`}>
+                                  <input aria-label={`${row.label} เสียหาย ${choice === "yes" ? "มี" : "ไม่มี"}`} checked={value.damage === choice} onChange={() => toggleCurrentSignInspectionChecklistChoice(row.key, "damage", choice)} type="checkbox" />
+                                </td>
+                              ))}
+                              {(["usable", "unusable"] as const).map((choice) => (
+                                <td className="sign-maintenance-checkbox-cell" data-label={choice === "usable" ? "ใช้ได้" : "ใช้ไม่ได้"} key={`result-${choice}`}>
+                                  <input aria-label={`${row.label} ${choice === "usable" ? "ใช้ได้" : "ใช้ไม่ได้"}`} checked={value.result === choice} onChange={() => toggleCurrentSignInspectionChecklistChoice(row.key, "result", choice)} type="checkbox" />
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && (currentTemplatePage === 5 || currentTemplatePage === 6) ? (
+          <section className="builder-card sign-inspection-page14-form">
+            <div className="image-upload-header">
+              <div>
+                <span className="page-kicker">หน้า {currentTemplatePage} / 15</span>
+                <h2>รูปภาพป้ายที่ตรวจสอบ</h2>
+                <p>เลือก “เปลี่ยนรูป” เพื่ออัปโหลดจากเครื่อง หรือเลือก “ถ่ายรูป” เพื่อเปิดกล้อง รูปใหม่จะแสดงแทนตำแหน่งเดิมใน PDF ทันที</p>
+              </div>
+            </div>
+            <div className="upload-grid sign-inspection-page14-upload-grid">
+              {getSignInspectionImageSlotsForPage(currentTemplatePage).map((slot) => (
+                <ImageSlot
+                  edit={imageEdits[slot.key]}
+                  key={slot.key}
+                  onReplace={handleReplaceImage}
+                  slot={slot}
+                />
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 14 ? (
+          <section className="builder-card sign-inspection-page14-form">
+            <div className="image-upload-header">
+              <div>
+                <span className="page-kicker">หน้า 14 / 15</span>
+                <h2>รูปภาพระบบป้องกันฟ้าผ่า</h2>
+                <p>เปลี่ยนรูปหรือถ่ายรูปใหม่ได้ทั้ง 4 ช่อง รูปจะอยู่ในตำแหน่งเดิมของ PDF และแสดงในพรีวิวทันที</p>
+              </div>
+            </div>
+            <div className="upload-grid sign-inspection-page14-upload-grid">
+              {signInspectionPage14ImageSlots.map((slot) => (
+                <ImageSlot
+                  edit={imageEdits[slot.key]}
+                  key={slot.key}
+                  onReplace={handleReplaceImage}
+                  slot={slot}
+                />
+              ))}
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-inspection-report" && currentTemplatePage === 15 ? (
+          <section className="builder-card sign-maintenance-form-card sign-inspection-page15-form">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า 15 / 15</span>
+                <h2>สรุปการตรวจสอบอุปกรณ์ประกอบต่าง ๆ ของป้าย</h2>
+                <p>เลือก Checkbox จากตารางด้านซ้าย ระบบจะแสดง ✓ ลงใน PDF ด้านขวาทันที และเลือกซ้ำเพื่อยกเลิกได้</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือหน้า 15">
+                <button onClick={clearSignInspectionPage15} type="button">
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            <div className="sign-maintenance-table-wrap">
+              <table className="sign-maintenance-table result">
+                <thead>
+                  <tr>
+                    <th className="item-column" scope="col">รายการตรวจสอบ</th>
+                    {signInspectionPage15Options.map((option) => (
+                      <th key={option.key} scope="col">{option.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {signInspectionPage15Rows.map((row) => (
+                    <tr key={row.key}>
+                      <th className="sign-maintenance-item" scope="row">
+                        <span className="sign-inspection-row-number">{row.number}</span> {row.label}
+                      </th>
+                      {signInspectionPage15Options.map((option) => (
+                        <td className="sign-maintenance-checkbox-cell" data-label={option.label} key={option.key}>
+                          <input
+                            aria-label={`${row.label} ${option.label}`}
+                            checked={signInspectionPage15Choices[row.key] === option.key}
+                            onChange={() => toggleSignInspectionPage15Choice(row.key, option.key)}
+                            type="checkbox"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-maintenance-plan" && currentTemplatePage === 5 ? (
+          <section className="builder-card template-readonly-card">
+            <FileText size={24} aria-hidden="true" />
+            <div>
+              <span className="page-kicker">หน้า 5 / 7</span>
+              <h2>ข้อมูลคงที่ตาม PDF ต้นฉบับ</h2>
+              <p>หน้านี้กำหนดรอบตรวจเป็น “1 ปี” ไว้แล้ว และไม่เปิดให้แก้ไขข้อมูล</p>
+            </div>
+          </section>
+        ) : selectedTemplateId === "sign-maintenance-plan" ? (
+          <section className="builder-card sign-maintenance-form-card">
+            <div className="sign-maintenance-form-heading">
+              <div>
+                <span>หน้า {currentTemplatePage} / 7</span>
+                <h2>กรอกข้อมูลแบบฟอร์ม</h2>
+                <p>เลือก Checkbox จากตารางด้านซ้าย ระบบจะแสดง ✓ บน PDF ด้านขวาทันที โดยไม่แก้ไขไฟล์ต้นฉบับ</p>
+              </div>
+              <div className="sign-maintenance-toolbar" role="toolbar" aria-label="เครื่องมือกรอกแบบฟอร์ม">
+                <button
+                  className={signMaintenanceTool === "check" ? "active" : ""}
+                  onClick={() => setSignMaintenanceTool("check")}
+                  type="button"
+                >
+                  <Check size={16} aria-hidden="true" /> ติ๊กช่อง
+                </button>
+                <button
+                  className={signMaintenanceTool === "remark" ? "active" : ""}
+                  onClick={() => setSignMaintenanceTool("remark")}
+                  type="button"
+                >
+                  <MessageSquare size={16} aria-hidden="true" /> หมายเหตุ
+                </button>
+                <button onClick={clearSignMaintenancePage} type="button" disabled={currentSignMaintenanceRows.length === 0}>
+                  <Eraser size={16} aria-hidden="true" /> ล้างค่า
+                </button>
+                <button onClick={() => void handleSaveDraft()} type="button" disabled={draftSaveStatus === "saving"}>
+                  <Save size={16} aria-hidden="true" /> {draftSaveStatus === "saving" ? "กำลังบันทึก" : "บันทึก"}
+                </button>
+                <button className="primary" onClick={() => void handleDownloadPdf()} type="button" disabled={isGeneratingPdf}>
+                  <FileText size={16} aria-hidden="true" /> {isGeneratingPdf ? "กำลังสร้าง" : "สร้าง PDF"}
+                </button>
+              </div>
+            </div>
+
+            {currentSignMaintenanceRows.length === 0 ? (
+              <div className="page-edit-empty">
+                <h2>หน้านี้ไม่มีช่องที่ต้องกรอก</h2>
+                <p>หน้าที่ 1–4 เป็นเนื้อหาคู่มือ ระบบจะคงหน้าเดิมไว้และเริ่มกรอกตารางที่หน้า 5</p>
+              </div>
+            ) : (
+              <div className="sign-maintenance-table-list">
+                {Array.from(
+                  currentSignMaintenanceRows.reduce((groups, row) => {
+                    const groupKey = `${row.kind}:${row.section}`;
+                    const group = groups.get(groupKey);
+                    if (group) group.rows.push(row);
+                    else groups.set(groupKey, { kind: row.kind, section: row.section, rows: [row] });
+                    return groups;
+                  }, new Map<string, {
+                    kind: "frequency" | "result";
+                    section: string;
+                    rows: typeof currentSignMaintenanceRows;
+                  }>()).values()
+                ).map((group) => {
+                  const options = group.kind === "frequency"
+                    ? signMaintenanceFrequencyOptions
+                    : signMaintenanceResultOptions;
+                  return (
+                    <section className="sign-maintenance-table-section" key={`${group.kind}:${group.section}`}>
+                      <h3>{group.section}</h3>
+                      <div className="sign-maintenance-table-wrap">
+                        <table className={`sign-maintenance-table ${group.kind}`}>
+                          <thead>
+                            <tr>
+                              <th className="item-column" scope="col">รายการตรวจ</th>
+                              {options.map((option) => (
+                                <th key={option.key} scope="col">{option.label}</th>
+                              ))}
+                              <th className="remark-column" scope="col">หมายเหตุ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {group.rows.map((row) => {
+                              const remark = signMaintenanceForm.remarks[row.key];
+                              return (
+                                <tr key={row.key}>
+                                  <th className="sign-maintenance-item" scope="row">{row.label}</th>
+                                  {options.map((option) => {
+                                    const checked = signMaintenanceForm.choices[row.key] === option.key;
+                                    return (
+                                      <td className="sign-maintenance-checkbox-cell" data-label={option.label} key={option.key}>
+                                        <input
+                                          aria-label={`${row.label} ${option.label}`}
+                                          checked={checked}
+                                          onChange={() => toggleSignMaintenanceChoice(row.key, option.key)}
+                                          type="checkbox"
+                                        />
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="sign-maintenance-remark-cell">
+                                    <div className="sign-maintenance-remark-editor">
+                                      <span>หมายเหตุ</span>
+                                      <button
+                                        className={remark?.kind === "check" ? "selected" : ""}
+                                        onClick={() => updateSignMaintenanceRemark(row.key, remark?.kind === "check" ? null : "check")}
+                                        type="button"
+                                      >✓</button>
+                                      <button
+                                        className={remark?.kind === "none" ? "selected" : ""}
+                                        onClick={() => updateSignMaintenanceRemark(row.key, remark?.kind === "none" ? null : "none")}
+                                        type="button"
+                                      >-ไม่มี</button>
+                                      <input
+                                        aria-label={`หมายเหตุ ${row.label}`}
+                                        onChange={(event) => updateSignMaintenanceRemark(row.key, event.target.value ? "text" : null, event.target.value)}
+                                        placeholder="พิมพ์ข้อความเอง"
+                                        value={remark?.kind === "text" ? remark.text : ""}
+                                      />
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            )}
+          </section>
         ) : (
           <section className="builder-card template-readonly-card">
             <FileText size={24} aria-hidden="true" />
             <div>
-              <h2>แผนปฏิบัติการการตรวจบำรุงรักษาอาคาร</h2>
+              <h2>{selectedTemplate.name}</h2>
               <p>เลือกหน้าจากแถบด้านขวาเพื่อดูเอกสาร และกด “สร้าง PDF” เพื่อดาวน์โหลดไฟล์ฉบับนี้</p>
             </div>
           </section>
@@ -1633,11 +3629,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               {selectedTemplateId === "annual-inspection" && (currentTemplatePage === 14 || currentTemplatePage === 15)
                 ? null
                 : <div className="locked-overlay">LOCKED TEMPLATE</div>}
-              <ReportPdfPreview
-                page={currentTemplatePage}
-                renderState={renderState}
-                zoom={previewZoom}
-              />
+              <ReportPdfPreview page={currentTemplatePage} renderState={renderState} zoom={previewZoom} />
             </div>
           </div>
           <div className="thumb-strip">
@@ -1843,4 +3835,12 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       ) : null}
     </section>
   );
+}
+
+function formatHistoryDate(value: string | null | undefined) {
+  if (!value) return "ไม่ระบุวันที่";
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }

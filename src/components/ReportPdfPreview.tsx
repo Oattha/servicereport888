@@ -27,7 +27,7 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = canvas?.parentElement;
+    const container = canvas?.parentElement?.parentElement;
     if (!container) return;
 
     const updateWidth = () => {
@@ -119,7 +119,12 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
       () => {
         void renderPdf();
       },
-      isPageChanged ? 0 : 300 
+      isPageChanged
+        || renderState.templateId === "sign-maintenance-plan"
+        || (renderState.templateId === "mixing-workshop-maintenance-plan"
+          && (page === 14 || page === 15 || (page >= 23 && page <= 32) || page === 34 || page === 35))
+        ? 0
+        : 300
     );
 
     return () => {
@@ -146,17 +151,20 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
     <>
       {isLoading ? <div className="pdf-preview-loading">กำลังสร้างตัวอย่าง PDF</div> : null}
       {errorMessage ? <div className="pdf-preview-loading">Preview error: {errorMessage}</div> : null}
-      <canvas
-        aria-label={`PDF template page ${page}`}
-        className={isLoading ? "pdf-template-frame loading" : "pdf-template-frame"}
-        ref={canvasRef}
+      <div
+        className="pdf-preview-canvas-stack"
         style={{
           height: `${zoom}%`,
-          width: "auto",
-          maxHeight: zoom === 100 ? "100%" : "none",
-          maxWidth: zoom === 100 ? "100%" : "none"
+          maxHeight: zoom === 100 ? "100%" : "none"
         }}
-      />
+      >
+        <canvas
+          aria-label={`PDF template page ${page}`}
+          className={isLoading ? "pdf-template-frame loading" : "pdf-template-frame"}
+          ref={canvasRef}
+          style={{ height: "100%", width: "100%" }}
+        />
+      </div>
     </>
   );
 }

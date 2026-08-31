@@ -21,6 +21,36 @@ import { defaultMaintenancePlanPage8Checks } from "../data/maintenancePlanPage8"
 import { defaultMaintenancePlanPages9To16Checks } from "../data/maintenancePlanPages9To16";
 import { defaultMaintenancePlanPage18Values } from "../data/maintenancePlanPage18";
 import { defaultMaintenancePlanPage19Values, defaultMaintenancePlanPage19Signature } from "../data/maintenancePlanPage19";
+import { defaultSignMaintenanceFormState } from "../data/signMaintenancePlan";
+import {
+  defaultMixingWorkshopPage14Checks,
+  defaultMixingWorkshopPage15Checks,
+  defaultMixingWorkshopRemarks
+} from "../data/mixingWorkshopPage14";
+import {
+  defaultMixingWorkshopPage23Checks,
+  defaultMixingWorkshopPage23Remarks
+} from "../data/mixingWorkshopPage23";
+import {
+  defaultMixingWorkshopPage24Checks,
+  defaultMixingWorkshopPage24Remarks
+} from "../data/mixingWorkshopPage24";
+import {
+  defaultMixingWorkshopPage25Checks,
+  defaultMixingWorkshopPage25Remarks
+} from "../data/mixingWorkshopPage25";
+import {
+  defaultMixingWorkshopPage26Checks,
+  defaultMixingWorkshopPage26Remarks
+} from "../data/mixingWorkshopPage26";
+import {
+  defaultMixingWorkshopPages27To32Checks,
+  defaultMixingWorkshopPages27To32Remarks
+} from "../data/mixingWorkshopPages27To32";
+import {
+  defaultMixingWorkshopPages34To35Choices,
+  defaultMixingWorkshopPages34To35Remarks
+} from "../data/mixingWorkshopPages34To35";
 import { defaultPage14Checkboxes } from "../data/page14Checkboxes";
 import { defaultPage18Checks, defaultPage18Materials, defaultPage18Text } from "../data/page18Fields";
 import { defaultPage23Remarks, defaultPage23Results } from "../data/page23Fields";
@@ -124,6 +154,22 @@ export function AllReportsPage() {
       maintenancePlanPage18Values: defaultMaintenancePlanPage18Values,
       maintenancePlanPage19Values: defaultMaintenancePlanPage19Values,
       maintenancePlanPage19Signature: defaultMaintenancePlanPage19Signature,
+      signMaintenanceForm: structuredClone(defaultSignMaintenanceFormState),
+      mixingWorkshopPage14Checks: { ...defaultMixingWorkshopPage14Checks },
+      mixingWorkshopPage15Checks: { ...defaultMixingWorkshopPage15Checks },
+      mixingWorkshopRemarks: { ...defaultMixingWorkshopRemarks },
+      mixingWorkshopPage23Checks: { ...defaultMixingWorkshopPage23Checks },
+      mixingWorkshopPage23Remarks: { ...defaultMixingWorkshopPage23Remarks },
+      mixingWorkshopPage24Checks: { ...defaultMixingWorkshopPage24Checks },
+      mixingWorkshopPage24Remarks: { ...defaultMixingWorkshopPage24Remarks },
+      mixingWorkshopPage25Checks: { ...defaultMixingWorkshopPage25Checks },
+      mixingWorkshopPage25Remarks: { ...defaultMixingWorkshopPage25Remarks },
+      mixingWorkshopPage26Checks: { ...defaultMixingWorkshopPage26Checks },
+      mixingWorkshopPage26Remarks: { ...defaultMixingWorkshopPage26Remarks },
+      mixingWorkshopPages27To32Checks: structuredClone(defaultMixingWorkshopPages27To32Checks),
+      mixingWorkshopPages27To32Remarks: structuredClone(defaultMixingWorkshopPages27To32Remarks),
+      mixingWorkshopPages34To35Choices: structuredClone(defaultMixingWorkshopPages34To35Choices),
+      mixingWorkshopPages34To35Remarks: structuredClone(defaultMixingWorkshopPages34To35Remarks),
       fieldValues: {
         ...defaultTemplateFieldValues,
         owner_company: report.customer,

@@ -1,6 +1,11 @@
 node_modules/
 dist/
 tmp/
+output/
+.venv/
+__pycache__/
+*.py[cod]
+*.traineddata
 .env
 .env.local
 *.log

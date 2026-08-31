@@ -1,5 +1,5 @@
 import fontkit from "@pdf-lib/fontkit";
-import { decodePDFRawStream, PDFArray, PDFDict, PDFDocument, PDFFont, PDFName, PDFRawStream, PDFStream, PDFString, rgb } from "pdf-lib";
+import { decodePDFRawStream, PDFArray, PDFDict, PDFDocument, PDFFont, PDFName, PDFRawStream, PDFStream, PDFString, rgb, StandardFonts } from "pdf-lib";
 import {
   inspectionChecklistItems,
   inspectionFrequencyOptions,
@@ -27,7 +27,90 @@ import {
   type MaintenancePlanPage18Values
 } from "../data/maintenancePlanPage18";
 import { maintenancePlanPage19Items } from "../data/maintenancePlanPage19";
+import {
+  signMaintenanceChoiceColumns,
+  signMaintenanceFrequencyOptions,
+  signMaintenanceResultOptions,
+  signMaintenanceRows
+} from "../data/signMaintenancePlan";
+import {
+  signInspectionPage15ChoiceColumns,
+  signInspectionPage15Rows
+} from "../data/signInspectionPage15";
+import { signInspectionPage14ImageSlots } from "../data/signInspectionPage14";
+import { signInspectionPages5To6ImageSlots } from "../data/signInspectionPages5To6";
+import {
+  signInspectionPage13Columns,
+  signInspectionPage13Rows
+} from "../data/signInspectionPage13";
+import { signInspectionPage12Rows } from "../data/signInspectionPage12";
+import {
+  hasBuildingMountedSign,
+  signInspectionPage7GroupCheckboxes,
+  signInspectionPage7TypeOptions,
+  type SignInspectionPage7Contact,
+  type SignInspectionPage7Group
+} from "../data/signInspectionPage7";
+import {
+  signInspectionPage8ImageSlots,
+  signInspectionPage8MaterialOptions,
+  signInspectionPage8UsageCheckboxes
+} from "../data/signInspectionPage8";
+import {
+  signInspectionPage4Checkboxes,
+  signInspectionPage4MapSlot
+} from "../data/signInspectionPage4";
+import { signInspectionPage9Sections } from "../data/signInspectionPage9";
+import {
+  defaultSignInspectionCoverFields,
+  signInspectionCoverFieldKeys,
+  signInspectionCoverImageSlot
+} from "../data/signInspectionCover";
+import {
+  defaultMixingWorkshopPage14Checks,
+  defaultMixingWorkshopPage15Checks,
+  mixingWorkshopPage14ChoiceColumns,
+  mixingWorkshopPage14FrequencyOptions,
+  mixingWorkshopPage14Rows,
+  mixingWorkshopPage15Rows
+} from "../data/mixingWorkshopPage14";
+import {
+  defaultMixingWorkshopPage23Checks,
+  mixingWorkshopPage23ChoiceColumns,
+  mixingWorkshopPage23Rows
+} from "../data/mixingWorkshopPage23";
+import {
+  defaultMixingWorkshopPage24Checks,
+  mixingWorkshopPage24ChoiceColumns,
+  mixingWorkshopPage24FrequencyOptions,
+  mixingWorkshopPage24RemarkColumn,
+  mixingWorkshopPage24Rows
+} from "../data/mixingWorkshopPage24";
+import {
+  defaultMixingWorkshopPage25Checks,
+  mixingWorkshopPage25ChoiceColumns,
+  mixingWorkshopPage25Rows
+} from "../data/mixingWorkshopPage25";
+import {
+  defaultMixingWorkshopPage26Checks,
+  mixingWorkshopPage26ChoiceColumns,
+  mixingWorkshopPage26Rows
+} from "../data/mixingWorkshopPage26";
+import {
+  defaultMixingWorkshopPages27To32Checks,
+  mixingWorkshopExtendedChoiceColumns,
+  mixingWorkshopExtendedRemarkColumn,
+  mixingWorkshopPages27To32Definitions
+} from "../data/mixingWorkshopPages27To32";
+import {
+  defaultMixingWorkshopPages34To35Choices,
+  mixingWorkshopPages34To35Definitions,
+  mixingWorkshopSummaryChoiceColumns,
+  mixingWorkshopSummaryOptions,
+  mixingWorkshopSummaryRemarkColumn
+} from "../data/mixingWorkshopPages34To35";
 import { annualInspectionTemplate, imageSlots } from "../data/pdfTemplate";
+import { getReportTemplate } from "../data/reportTemplates";
 import type { ReportRenderState } from "../types";
 import { getCoverFitPlacement } from "./templateEditing";
 
@@ -1624,6 +1707,52 @@ async function replacePage23Table(pdf: PDFDocument, state: ReportRenderState) {
   const remarkBytes = await createPage23RemarkOverlayBytes(page23ChecklistItems, state.page23Remarks);
   const remarkOverlay = await pdf.embedPng(remarkBytes);
   page.drawImage(remarkOverlay, { x: tableLeft, y: 0, width: tableRight - tableLeft, height: 780 });
+
+  // Page 24 must end after the inspection table. Remove the original
+  // "additional details / suggestions" heading and writing lines while
+  // preserving the template footer and page number below.
+  page.drawRectangle({
+    x: 65,
+    y: 22,
+    width: 460,
+    height: tableBottom - 22,
+    color: rgb(1, 1, 1)
+  });
+}
+
+function drawLeftWrappedText(
+  page: ReturnType<PDFDocument["getPages"]>[number],
+  font: PDFFont,
+  text: string,
+  x: number,
+  centerBaselineY: number,
+  maxWidth: number,
+  preferredSize: number,
+  maxLines = 2
+) {
+  const safeText = text.trim();
+  if (!safeText) return;
+
+  let fontSize = preferredSize;
+  let lines = wrapText(font, safeText, maxWidth, fontSize);
+  while (fontSize > 8 && lines.length > maxLines) {
+    fontSize -= 0.5;
+    lines = wrapText(font, safeText, maxWidth, fontSize);
+  }
+
+  const visibleLines = lines.slice(0, maxLines);
+  const lineHeight = fontSize + 4;
+  const firstBaseline = centerBaselineY + ((visibleLines.length - 1) * lineHeight) / 2;
+  visibleLines.forEach((line, index) => {
+    const textWidth = font.widthOfTextAtSize(line, fontSize);
+    page.drawText(line, {
+      x: index === 0 ? x : x + maxWidth - textWidth,
+      y: firstBaseline - index * lineHeight,
+      size: fontSize,
+      font,
+      color: rgb(0.231, 0.22, 0.22)
+    });
+  });
 }
 
 async function replacePage24Table(pdf: PDFDocument, state: ReportRenderState) {
@@ -1678,6 +1807,16 @@ async function replacePage24Table(pdf: PDFDocument, state: ReportRenderState) {
   const remarkBytes = await createPage23RemarkOverlayBytes(page24ChecklistItems, state.page24Remarks);
   const remarkOverlay = await pdf.embedPng(remarkBytes);
   page.drawImage(remarkOverlay, { x: tableLeft, y: 0, width: tableRight - tableLeft, height: 780 });
+
+  // The source document labels this sheet as page 24. Keep the checklist and
+  // footer, but leave the former additional-details area completely blank.
+  page.drawRectangle({
+    x: 65,
+    y: 22,
+    width: 460,
+    height: tableBottom - 22,
+    color: rgb(1, 1, 1)
+  });
 }
 
 const PAGE25_THAI_MONTH_NAMES = [
@@ -1821,6 +1960,293 @@ async function imageUrlToSignaturePngBytes(imageUrl: string, targetWidth: number
   return new Uint8Array(await blob.arrayBuffer());
 }
 
+function drawAnnualAssessmentWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number
+) {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+
+  for (const word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (context.measureText(candidate).width <= maxWidth) {
+      line = candidate;
+      continue;
+    }
+
+    if (line) lines.push(line);
+    if (context.measureText(word).width <= maxWidth) {
+      line = word;
+      continue;
+    }
+
+    let fragment = "";
+    for (const character of Array.from(word)) {
+      const nextFragment = fragment + character;
+      if (fragment && context.measureText(nextFragment).width > maxWidth) {
+        lines.push(fragment);
+        fragment = character;
+      } else {
+        fragment = nextFragment;
+      }
+    }
+    line = fragment;
+  }
+
+  if (line) lines.push(line);
+  lines.forEach((value, index) => context.fillText(value, x, y + index * lineHeight));
+  return y + lines.length * lineHeight;
+}
+
+async function createAnnualAssessmentPageBytes(state: ReportRenderState) {
+  const scale = 4;
+  const width = 540;
+  const height = 780;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare annual assessment page");
+
+  try {
+    const assessmentFont = new FontFace("AnnualAssessmentTahoma", 'url("/fonts/tahoma.ttf")');
+    await assessmentFont.load();
+    document.fonts.add(assessmentFont);
+  } catch {
+    // The browser font stack below remains a safe fallback for preview and export.
+  }
+
+  context.scale(scale, scale);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.textBaseline = "alphabetic";
+  context.textRendering = "geometricPrecision";
+  context.fillStyle = "#111827";
+
+  const logo = await loadImage(DEFAULT_HEADER_LOGO_URL);
+  const logoBox = { x: 32, y: 13, width: 167, height: 37 };
+  const logoScale = Math.min(logoBox.width / logo.naturalWidth, logoBox.height / logo.naturalHeight);
+  const logoWidth = logo.naturalWidth * logoScale;
+  const logoHeight = logo.naturalHeight * logoScale;
+  context.drawImage(
+    logo,
+    logoBox.x,
+    logoBox.y + (logoBox.height - logoHeight) / 2,
+    logoWidth,
+    logoHeight
+  );
+
+  context.font = '9px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.textAlign = "right";
+  context.fillText("ส่วนที่ 5 รายละเอียดผลการตรวจสอบอาคารและอุปกรณ์ประกอบอาคาร", 508, 25);
+  context.fillText("รายงานตรวจสอบอาคารประเภทการตรวจสอบประจำปี", 508, 40);
+  context.strokeStyle = "#111827";
+  context.lineWidth = 0.7;
+  context.beginPath();
+  context.moveTo(32, 59);
+  context.lineTo(508, 59);
+  context.stroke();
+
+  context.textAlign = "left";
+  context.fillStyle = "#111827";
+  context.font = 'bold 17px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.fillText("สรุปความเห็นของผู้ตรวจสอบอาคาร", 38, 88);
+
+  const passed = state.annualAssessmentResult === "pass";
+  const badgeX = 178;
+  const badgeY = 99;
+  const badgeWidth = 184;
+  const badgeHeight = 31;
+  context.fillStyle = passed ? "#dcfce7" : "#fee2e2";
+  context.strokeStyle = passed ? "#15803d" : "#b91c1c";
+  context.lineWidth = 1.2;
+  context.beginPath();
+  context.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, 15);
+  context.fill();
+  context.stroke();
+  context.fillStyle = passed ? "#166534" : "#991b1b";
+  context.textAlign = "center";
+  context.font = 'bold 15px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.fillText(passed ? "ผ่านการตรวจสอบ" : "ไม่ผ่านการตรวจสอบ", badgeX + badgeWidth / 2, badgeY + 21);
+
+  const ownerCompany = getFieldValue(state, "owner_company");
+  const buildingName = getFieldValue(state, "building_name");
+  const reportYear = getFieldValue(state, "cover_year") || "2569";
+  context.textAlign = "left";
+  context.fillStyle = "#111827";
+  context.font = '11.2px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  let cursorY = drawAnnualAssessmentWrappedText(
+    context,
+    `ผลการตรวจสอบสภาพอาคารและอุปกรณ์ต่าง ๆ ของ ${buildingName || "อาคาร"}${ownerCompany ? ` ของ ${ownerCompany}` : ""} ได้แก่`,
+    38,
+    151,
+    464,
+    17
+  );
+
+  const inspectionItems = [
+    "1. การตรวจสอบความมั่นคงแข็งแรงของอาคาร",
+    "2. การตรวจสอบระบบและอุปกรณ์ประกอบของอาคาร",
+    "3. การตรวจสอบสมรรถนะของระบบและอุปกรณ์ต่าง ๆ ของอาคารเพื่ออพยพผู้ใช้อาคาร",
+    "4. การตรวจสอบระบบบริหารจัดการความปลอดภัยในอาคาร"
+  ];
+  cursorY += 4;
+  inspectionItems.forEach((item) => {
+    cursorY = drawAnnualAssessmentWrappedText(context, item, 76, cursorY, 420, 16) + 2;
+  });
+
+  context.font = '11.2px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  const resultText = passed
+    ? "ผลการตรวจสอบพบว่า อาคารมีความมั่นคงแข็งแรง ระบบและอุปกรณ์ประกอบอาคารอยู่ในสภาพปลอดภัยและสามารถใช้งานได้ตามปกติ ไม่พบข้อบกพร่องร้ายแรงที่ส่งผลกระทบต่อความปลอดภัยของผู้ใช้อาคาร"
+    : "ผลการตรวจสอบพบข้อบกพร่องที่อาจส่งผลกระทบต่อความมั่นคงแข็งแรงหรือความปลอดภัยของผู้ใช้อาคาร เจ้าของอาคารต้องดำเนินการแก้ไขตามข้อเสนอแนะของผู้ตรวจสอบ และตรวจยืนยันผลอีกครั้งก่อนรับรองว่าอาคารผ่านการตรวจสอบ";
+  cursorY = drawAnnualAssessmentWrappedText(context, resultText, 38, cursorY + 8, 464, 17);
+
+  const certificationText = "ข้าพเจ้าในฐานะผู้ตรวจสอบอาคารขอรับรองว่าได้ทำการตรวจสอบสภาพอาคารดังกล่าว โดยผลการตรวจสอบอาคารและอุปกรณ์ประกอบอาคารถูกต้องและเป็นจริงตามที่ระบุไว้ในรายงานฉบับนี้ รวมทั้งได้แจ้งผลการตรวจสอบให้เจ้าของอาคาร ผู้ครอบครอง หรือผู้ดูแลอาคารได้รับทราบแล้ว";
+  cursorY = drawAnnualAssessmentWrappedText(context, certificationText, 38, cursorY + 9, 464, 17);
+
+  const inspectorName = state.page25Signatures.inspectorName.trim() || "นายสนทยา คำภีร์ทอง";
+  const thaiDate = formatPage25ThaiDate(state.page25Signatures.inspectionDate);
+  context.font = '11px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.fillText("ลงชื่อ ..................................................................... ผู้ตรวจสอบอาคาร", 86, cursorY + 23);
+  context.textAlign = "center";
+  context.fillText(`( ${inspectorName} )`, 239, cursorY + 43);
+  context.fillText(`วันที่ ${thaiDate ?? "........................................"}`, 239, cursorY + 63);
+
+  cursorY += 86;
+  context.textAlign = "left";
+  context.font = 'bold 11.5px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.fillText("เลขทะเบียนผู้ตรวจสอบ", 38, cursorY);
+  context.beginPath();
+  context.moveTo(38, cursorY + 2);
+  context.lineTo(139, cursorY + 2);
+  context.stroke();
+  context.font = '10px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  cursorY = drawAnnualAssessmentWrappedText(
+    context,
+    `ผู้ตรวจสอบประเภทนิติบุคคล ทะเบียนเลขที่ น.0388/${reportYear} กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย โดยนาม บริษัท โปรวิชั่น อินสเปคเตอร์ จำกัด 89/115 หมู่บ้านพฤกษาวิลล์ 76 หมู่ที่ 1 ตำบลบางพลีใหญ่ อำเภอบางพลี สมุทรปราการ 10530`,
+    38,
+    cursorY + 18,
+    464,
+    15
+  );
+
+  const ownerAcknowledgement = "ข้าพเจ้าในฐานะ เจ้าของอาคาร ผู้ครอบครอง ผู้ดูแลอาคาร หรือผู้จัดการนิติบุคคลอาคารชุด ขอรับรองว่าได้มีการตรวจสอบอาคารตามรายงานดังกล่าวข้างต้นจริง โดยการตรวจสอบอาคารนั้น กระทำโดยผู้ตรวจสอบอาคารซึ่งได้รับใบอนุญาตจากกรมโยธาธิการและผังเมือง ข้าพเจ้าได้อ่านและเข้าใจในรายงานดังกล่าวครบถ้วนแล้ว จึงลงลายมือชื่อไว้เป็นสำคัญ";
+  context.font = '10.4px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  cursorY = drawAnnualAssessmentWrappedText(context, ownerAcknowledgement, 38, cursorY + 9, 464, 15);
+
+  const ownerFullName = [state.page25Signatures.ownerTitle?.trim(), state.page25Signatures.ownerName.trim()]
+    .filter(Boolean)
+    .join(" ");
+  const ownerPosition = state.page25Signatures.ownerPosition.trim();
+  context.font = '10.5px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.fillText("ลงชื่อ ................................................................ เจ้าของอาคาร / ผู้จัดการนิติบุคคลอาคารชุด", 66, cursorY + 24);
+  context.textAlign = "center";
+  context.fillText(`( ${[ownerFullName, ownerPosition].filter(Boolean).join(" / ") || "........................................................"} )`, 242, cursorY + 43);
+
+  context.fillStyle = "#4b5563";
+  context.font = '10px "AnnualAssessmentTahoma", Tahoma, sans-serif';
+  context.textAlign = "right";
+  context.fillText("26 | Page", 505, 761);
+  context.strokeStyle = "#4b5563";
+  context.beginPath();
+  context.moveTo(453, 766);
+  context.lineTo(508, 766);
+  context.stroke();
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode annual assessment page"));
+    }, "image/png");
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function replaceAnnualAssessmentPage(pdf: PDFDocument, state: ReportRenderState) {
+  if (!state.annualAssessmentResult) {
+    await replacePage25Signatures(pdf, state);
+    return;
+  }
+
+  const page = pdf.getPages()[25];
+  const pageBytes = await createAnnualAssessmentPageBytes(state);
+  const pageImage = await pdf.embedPng(pageBytes);
+  page.drawRectangle({ x: 0, y: 0, width: 540, height: 780, color: rgb(1, 1, 1) });
+  page.drawImage(pageImage, { x: 0, y: 0, width: 540, height: 780 });
+}
+
+async function createAnnualFooterPageNumberBytes(pageNumber: number) {
+  const scale = 4;
+  const width = 85;
+  const height = 42;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare annual footer page number");
+
+  const cordiaFont = new FontFace("AnnualFooterCordiaNew", 'local("Cordia New")');
+  const calibriFont = new FontFace("AnnualFooterCalibri", 'local("Calibri")');
+  try {
+    const [loadedCordia, loadedCalibri] = await Promise.all([cordiaFont.load(), calibriFont.load()]);
+    document.fonts.add(loadedCordia);
+    document.fonts.add(loadedCalibri);
+  } catch {
+    // The Windows font stack below remains a safe visual fallback.
+  }
+
+  context.scale(scale, scale);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#000000";
+  context.textBaseline = "alphabetic";
+  context.textAlign = "left";
+
+  // Match the mixed font sizes and exact baseline positions of the original
+  // template footer (for example, page 22) instead of using one small font.
+  context.font = '27.96px "AnnualFooterCordiaNew", "Cordia New", Tahoma, sans-serif';
+  context.fillText(String(pageNumber), 27.13, 18.81);
+  context.font = '14.04px "AnnualFooterCalibri", Calibri, Arial, sans-serif';
+  context.fillText("I", 49.99, 18.72);
+  context.font = '14.04px "AnnualFooterCordiaNew", "Cordia New", Tahoma, sans-serif';
+  context.fillText("Page", 57.42, 18.5);
+
+  context.strokeStyle = "#7f7f7f";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(22.77, 23.5);
+  context.lineTo(width, 23.5);
+  context.stroke();
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode annual footer page number"));
+    }, "image/png");
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function replaceAnnualFooterPageNumbers(pdf: PDFDocument) {
+
+  for (let pageNumber = 23; pageNumber <= 26; pageNumber += 1) {
+    const page = pdf.getPages()[pageNumber - 1];
+    if (!page) continue;
+
+    // The annual report inserts a new page 23. Clear the old template footer
+    // (or the blank inserted-page footer), then redraw the correct output page
+    // number with the same typography and placement as the original pages.
+    const footerBytes = await createAnnualFooterPageNumberBytes(pageNumber);
+    const footerImage = await pdf.embedPng(footerBytes);
+    page.drawImage(footerImage, { x: 445, y: 0, width: 85, height: 42 });
+  }
+}
+
 async function replacePage25Signatures(pdf: PDFDocument, state: ReportRenderState) {
   const page = pdf.getPages()[25];
   const hasInspectorText = Boolean(
@@ -1874,14 +2300,19 @@ async function replaceCoverText(pdf: PDFDocument, state: ReportRenderState) {
   const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
   const ownerCompany = getFieldValue(state, "owner_company");
   const buildingName = getFieldValue(state, "building_name");
-  
-  const isControlledUse = state.page14Checks.is_controlled_use_building;
-  const buildingDescription = isControlledUse 
-    ? "อาคารประเภทควบคุมการใช้" 
-    : getFieldValue(state, "building_description");
+
+  const selectedBuildingTypes = page17BuildingTypeOptions.flatMap((option) => {
+    if (!state.page17BuildingTypes[option.key]) return [];
+    if (option.key === "other") {
+      const otherText = state.page17OtherText.trim();
+      return otherText ? [otherText] : [];
+    }
+    return [option.label];
+  });
+  const buildingDescription = selectedBuildingTypes.join(" / ");
 
   drawCenteredText(page, thaiFont, `${ownerCompany} (${buildingName})`, 270, 111, 470, 22);
-  drawCenteredText(page, thaiFont, buildingDescription, 270, 72, 420, 20);
+  drawLeftWrappedText(page, thaiFont, buildingDescription, 60, 72, 420, 20, 2);
 }
 
 function drawCanvasWrappedText(
@@ -3071,7 +3502,1254 @@ async function replaceMaintenancePlanPage19Values(pdf: PDFDocument, state: Repor
   await replaceMaintenancePlanPage19Signature(pdf, state);
 }
 
+async function replaceTemplateHeaderYears(pdf: PDFDocument, pageNumbers: number[], year = "2569") {
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  for (const pageNumber of pageNumbers) {
+    const page = pdf.getPages()[pageNumber - 1];
+    if (!page) continue;
+    const box = { x: 480, y: 752, width: 41, height: 28 };
+    page.drawRectangle({ ...box, color: rgb(0.46, 0.46, 0.46) });
+    const fontSize = 10.5;
+    const textWidth = font.widthOfTextAtSize(year, fontSize);
+    page.drawText(year, {
+      x: box.x + (box.width - textWidth) / 2,
+      y: box.y + 8.5,
+      size: fontSize,
+      font,
+      color: rgb(1, 1, 1)
+    });
+  }
+}
+
+async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportRenderState) {
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+
+  for (const row of signMaintenanceRows) {
+    // Page 5 and the frequency table on page 6 intentionally use the original
+    // annual checks from the template. Only page 6's result table remains editable.
+    if (row.page === 5 || (row.page === 6 && row.kind === "frequency")) continue;
+    const page = pdf.getPages()[row.page - 1];
+    if (!page) continue;
+    const { height: pageHeight } = page.getSize();
+    const centerY = pageHeight - row.centerTop;
+    const options = row.kind === "frequency"
+      ? signMaintenanceFrequencyOptions
+      : signMaintenanceResultOptions;
+    const bounds = signMaintenanceChoiceColumns[row.kind];
+
+    for (const option of options) {
+      const [left, right] = bounds[option.key as keyof typeof bounds];
+      const centerX = (left + right) / 2;
+      page.drawRectangle({
+        x: centerX - 7,
+        y: centerY - 6,
+        width: 14,
+        height: 12,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const [remarkLeft, remarkRight] = signMaintenanceChoiceColumns.remark;
+    page.drawRectangle({
+      x: remarkLeft + 1,
+      y: centerY - 7,
+      width: remarkRight - remarkLeft - 2,
+      height: 14,
+      color: rgb(1, 1, 1)
+    });
+
+    const selectedChoice = state.signMaintenanceForm?.choices?.[row.key] ?? null;
+    if (selectedChoice) {
+      const [left, right] = bounds[selectedChoice as keyof typeof bounds];
+      if (left !== undefined && right !== undefined) {
+        drawPage23CheckMark(page, (left + right) / 2, centerY);
+      }
+    }
+
+    const remark = state.signMaintenanceForm?.remarks?.[row.key];
+    if (!remark?.kind) continue;
+    const remarkCenterX = (remarkLeft + remarkRight) / 2;
+    if (remark.kind === "check") {
+      drawPage23CheckMark(page, remarkCenterX, centerY);
+      continue;
+    }
+
+    const text = remark.kind === "none" ? "-ไม่มี" : remark.text.trim();
+    if (!text) continue;
+    let fontSize = remark.kind === "none" ? 7.5 : 6.5;
+    while (fontSize > 5 && thaiFont.widthOfTextAtSize(text, fontSize) > remarkRight - remarkLeft - 5) {
+      fontSize -= 0.5;
+    }
+    const lines = wrapText(thaiFont, text, remarkRight - remarkLeft - 5, fontSize).slice(0, 2);
+    const lineHeight = fontSize + 1;
+    const firstBaseline = centerY + ((lines.length - 1) * lineHeight) / 2 - fontSize * 0.35;
+    lines.forEach((line, index) => {
+      const textWidth = thaiFont.widthOfTextAtSize(line, fontSize);
+      page.drawText(line, {
+        x: remarkCenterX - textWidth / 2,
+        y: firstBaseline - index * lineHeight,
+        size: fontSize,
+        font: thaiFont,
+        color: rgb(0, 0, 0)
+      });
+    });
+  }
+}
+
+function drawMixingWorkshopRemark(
+  page: ReturnType<PDFDocument["getPages"]>[number],
+  centerY: number,
+  text: string,
+  thaiFont: PDFFont,
+  remarkLeft = 468,
+  remarkRight = 522.75
+) {
+  drawMixingWorkshopSummaryRemark(page, centerY, text, thaiFont, remarkLeft, remarkRight);
+}
+
+function drawMixingWorkshopSummaryRemark(
+  page: ReturnType<PDFDocument["getPages"]>[number],
+  centerY: number,
+  text: string,
+  thaiFont: PDFFont,
+  remarkLeft: number,
+  remarkRight: number
+) {
+  const horizontalPadding = 3.5;
+  const maxWidth = remarkRight - remarkLeft - horizontalPadding * 2;
+  page.drawRectangle({
+    x: remarkLeft + 1,
+    y: centerY - 8,
+    width: remarkRight - remarkLeft - 2,
+    height: 16,
+    color: rgb(1, 1, 1)
+  });
+
+  const value = text.trim();
+  if (!value) return;
+
+  let fontSize = 9.4;
+  let lines = wrapText(thaiFont, value, maxWidth, fontSize);
+  while ((lines.length > 2 || lines.some((line) => thaiFont.widthOfTextAtSize(line, fontSize) > maxWidth)) && fontSize > 6.8) {
+    fontSize -= 0.35;
+    lines = wrapText(thaiFont, value, maxWidth, fontSize);
+  }
+  lines = lines.slice(0, 2);
+  const lineHeight = fontSize + 0.6;
+  const firstBaseline = centerY + ((lines.length - 1) * lineHeight) / 2 - fontSize * 0.32;
+  lines.forEach((line, index) => {
+    const textWidth = thaiFont.widthOfTextAtSize(line, fontSize);
+    page.drawText(line, {
+      x: remarkLeft + (remarkRight - remarkLeft - textWidth) / 2,
+      y: firstBaseline - index * lineHeight,
+      size: fontSize,
+      font: thaiFont,
+      color: rgb(0, 0, 0)
+    });
+  });
+}
+
+function replaceMixingWorkshopPage14Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[13];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage14Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(page, centerY, state.mixingWorkshopRemarks?.[row.key] ?? "", thaiFont);
+
+    for (const option of mixingWorkshopPage14FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage14ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedFrequency = state.mixingWorkshopPage14Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage14Checks, row.key)
+      ? state.mixingWorkshopPage14Checks[row.key]
+      : defaultMixingWorkshopPage14Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage14ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function replaceMixingWorkshopPage15Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[14];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage15Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(page, centerY, state.mixingWorkshopRemarks?.[row.key] ?? "", thaiFont);
+
+    for (const option of mixingWorkshopPage14FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage14ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedFrequency = state.mixingWorkshopPage15Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage15Checks, row.key)
+      ? state.mixingWorkshopPage15Checks[row.key]
+      : defaultMixingWorkshopPage15Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage14ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function removeMixingWorkshopPage15InspectionDate(pdf: PDFDocument) {
+  const page = pdf.getPages()[14];
+  if (!page) return;
+  page.drawRectangle({
+    x: 140,
+    y: 62,
+    width: 190,
+    height: 25,
+    color: rgb(1, 1, 1)
+  });
+}
+
+function removeMixingWorkshopPage35InspectionDate(pdf: PDFDocument) {
+  const page = pdf.getPages()[34];
+  if (!page) return;
+  page.drawRectangle({
+    x: 130,
+    y: 50,
+    width: 250,
+    height: 40,
+    color: rgb(1, 1, 1)
+  });
+}
+
+function replaceMixingWorkshopPage24Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[23];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage24Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(
+      page,
+      centerY,
+      state.mixingWorkshopPage24Remarks?.[row.key] ?? "",
+      thaiFont,
+      mixingWorkshopPage24RemarkColumn[0],
+      mixingWorkshopPage24RemarkColumn[1]
+    );
+
+    for (const option of mixingWorkshopPage24FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage24ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedFrequency = state.mixingWorkshopPage24Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage24Checks, row.key)
+      ? state.mixingWorkshopPage24Checks[row.key]
+      : defaultMixingWorkshopPage24Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage24ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function replaceMixingWorkshopPage23Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[22];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage23Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(
+      page,
+      centerY,
+      state.mixingWorkshopPage23Remarks?.[row.key] ?? "",
+      thaiFont,
+      mixingWorkshopPage24RemarkColumn[0],
+      mixingWorkshopPage24RemarkColumn[1]
+    );
+    for (const option of mixingWorkshopPage24FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage23ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+    const selectedFrequency = state.mixingWorkshopPage23Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage23Checks, row.key)
+      ? state.mixingWorkshopPage23Checks[row.key]
+      : defaultMixingWorkshopPage23Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage23ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function replaceMixingWorkshopPage25Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[24];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage25Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(
+      page,
+      centerY,
+      state.mixingWorkshopPage25Remarks?.[row.key] ?? "",
+      thaiFont,
+      mixingWorkshopPage24RemarkColumn[0],
+      mixingWorkshopPage24RemarkColumn[1]
+    );
+
+    for (const option of mixingWorkshopPage24FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage25ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedFrequency = state.mixingWorkshopPage25Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage25Checks, row.key)
+      ? state.mixingWorkshopPage25Checks[row.key]
+      : defaultMixingWorkshopPage25Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage25ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function replaceMixingWorkshopPage26Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  const page = pdf.getPages()[25];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of mixingWorkshopPage26Rows) {
+    const centerY = pageHeight - row.centerTop;
+    drawMixingWorkshopRemark(
+      page,
+      centerY,
+      state.mixingWorkshopPage26Remarks?.[row.key] ?? "",
+      thaiFont,
+      mixingWorkshopPage24RemarkColumn[0],
+      mixingWorkshopPage24RemarkColumn[1]
+    );
+
+    for (const option of mixingWorkshopPage24FrequencyOptions) {
+      const [left, right] = mixingWorkshopPage26ChoiceColumns[option.key];
+      page.drawRectangle({
+        x: left + 2,
+        y: centerY - 7,
+        width: right - left - 4,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedFrequency = state.mixingWorkshopPage26Checks
+      && Object.prototype.hasOwnProperty.call(state.mixingWorkshopPage26Checks, row.key)
+      ? state.mixingWorkshopPage26Checks[row.key]
+      : defaultMixingWorkshopPage26Checks[row.key] ?? null;
+    if (!selectedFrequency) continue;
+    const [left, right] = mixingWorkshopPage26ChoiceColumns[selectedFrequency];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+}
+
+function replaceMixingWorkshopPages27To32Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  for (const definition of mixingWorkshopPages27To32Definitions) {
+    const page = pdf.getPages()[definition.page - 1];
+    if (!page) continue;
+    const { height: pageHeight } = page.getSize();
+    const checks = state.mixingWorkshopPages27To32Checks?.[definition.page]
+      ?? defaultMixingWorkshopPages27To32Checks[definition.page];
+    const remarks = state.mixingWorkshopPages27To32Remarks?.[definition.page] ?? {};
+
+    for (const row of definition.groups.flatMap((group) => group.rows)) {
+      const centerY = pageHeight - row.centerTop;
+      drawMixingWorkshopRemark(
+        page,
+        centerY,
+        remarks[row.key] ?? "",
+        thaiFont,
+        mixingWorkshopExtendedRemarkColumn[0],
+        mixingWorkshopExtendedRemarkColumn[1]
+      );
+
+      for (const option of mixingWorkshopPage24FrequencyOptions) {
+        const [left, right] = mixingWorkshopExtendedChoiceColumns[option.key];
+        page.drawRectangle({
+          x: left + 2,
+          y: centerY - 7,
+          width: right - left - 4,
+          height: 14,
+          color: rgb(1, 1, 1)
+        });
+      }
+
+      const selectedFrequency = Object.prototype.hasOwnProperty.call(checks, row.key)
+        ? checks[row.key]
+        : defaultMixingWorkshopPages27To32Checks[definition.page][row.key] ?? null;
+      if (!selectedFrequency) continue;
+      const [left, right] = mixingWorkshopExtendedChoiceColumns[selectedFrequency];
+      drawPage23CheckMark(page, (left + right) / 2, centerY);
+    }
+  }
+}
+
+function replaceMixingWorkshopPages34To35Values(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  thaiFont: PDFFont
+) {
+  for (const definition of mixingWorkshopPages34To35Definitions) {
+    const page = pdf.getPages()[definition.page - 1];
+    if (!page) continue;
+    const { height: pageHeight } = page.getSize();
+    const choices = state.mixingWorkshopPages34To35Choices?.[definition.page]
+      ?? defaultMixingWorkshopPages34To35Choices[definition.page];
+    const remarks = state.mixingWorkshopPages34To35Remarks?.[definition.page] ?? {};
+
+    for (const row of definition.groups.flatMap((group) => group.rows)) {
+      const centerY = pageHeight - row.centerTop;
+      drawMixingWorkshopSummaryRemark(
+        page,
+        centerY,
+        remarks[row.key] ?? "",
+        thaiFont,
+        mixingWorkshopSummaryRemarkColumn[0],
+        mixingWorkshopSummaryRemarkColumn[1]
+      );
+      for (const option of mixingWorkshopSummaryOptions) {
+        const [left, right] = mixingWorkshopSummaryChoiceColumns[option.key];
+        page.drawRectangle({
+          x: left + 1.2,
+          y: centerY - 6.8,
+          width: right - left - 2.4,
+          height: 13.6,
+          color: rgb(1, 1, 1)
+        });
+      }
+      const selectedChoice = Object.prototype.hasOwnProperty.call(choices, row.key)
+        ? choices[row.key]
+        : defaultMixingWorkshopPages34To35Choices[definition.page][row.key] ?? null;
+      if (!selectedChoice) continue;
+      const [left, right] = mixingWorkshopSummaryChoiceColumns[selectedChoice];
+      drawPage23CheckMark(page, (left + right) / 2, centerY);
+    }
+  }
+}
+
+async function replaceSignInspectionPage15Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[14];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+
+  for (const row of signInspectionPage15Rows) {
+    const centerY = pageHeight - row.centerTop;
+    for (const bounds of Object.values(signInspectionPage15ChoiceColumns)) {
+      const [left, right] = bounds;
+      page.drawRectangle({
+        x: left + 1,
+        y: centerY - 8,
+        width: right - left - 2,
+        height: 16,
+        color: rgb(1, 1, 1)
+      });
+    }
+
+    const selectedChoice = state.signInspectionPage15Choices?.[row.key] ?? null;
+    if (!selectedChoice) continue;
+    const [left, right] = signInspectionPage15ChoiceColumns[selectedChoice];
+    drawPage23CheckMark(page, (left + right) / 2, centerY);
+  }
+
+}
+
+async function replaceSignInspectionPage14Images(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[13];
+  if (!page) return;
+  const resources = page.node.Resources();
+  const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+  if (!xObjects) return;
+
+  for (const slot of signInspectionPage14ImageSlots) {
+    const edit = state.imageEdits[slot.key];
+    if (!edit || !slot.xObjectName) continue;
+    const imageBytes = await imageUrlToCoverPngBytes(edit.objectUrl, 489, 367);
+    const image = await pdf.embedPng(imageBytes);
+    xObjects.set(PDFName.of(slot.xObjectName), image.ref);
+  }
+}
+
+async function replaceSignInspectionPages5To6Images(pdf: PDFDocument, state: ReportRenderState) {
+  for (const slot of signInspectionPages5To6ImageSlots) {
+    const edit = state.imageEdits[slot.key];
+    if (!edit || !slot.xObjectName) continue;
+
+    const page = pdf.getPages()[slot.page - 1];
+    if (!page) continue;
+    const resources = page.node.Resources();
+    const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+    if (!xObjects) continue;
+
+    const targetWidth = 1600;
+    const targetHeight = slot.page === 6 ? 1131 : 1200;
+    const imageBytes = await imageUrlToCoverPngBytes(edit.objectUrl, targetWidth, targetHeight);
+    const image = await pdf.embedPng(imageBytes);
+    xObjects.set(PDFName.of(slot.xObjectName), image.ref);
+  }
+}
+
+async function replaceSignInspectionPage4Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[3];
+  if (!page) return;
+  const page4State = state.signInspectionPage4State;
+  if (!page4State) return;
+  const { height: pageHeight } = page.getSize();
+
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+
+  function redrawCheckbox(centerX: number, centerTop: number, selected: boolean) {
+    const centerY = pageHeight - centerTop;
+    page.drawRectangle({
+      x: centerX - 5.2,
+      y: centerY - 5.2,
+      width: 10.4,
+      height: 10.4,
+      color: rgb(1, 1, 1),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 0.65
+    });
+    if (selected) drawPage23CheckMark(page, centerX, centerY);
+  }
+
+  function drawWrappedBox(
+    placement: { x: number; top: number; width: number; height: number },
+    text: string,
+    preferredSize = 8.6
+  ) {
+    const bottom = pageHeight - placement.top - placement.height;
+    page.drawRectangle({ x: placement.x, y: bottom, width: placement.width, height: placement.height, color: rgb(1, 1, 1) });
+    const safeText = text.trim();
+    if (!safeText) return;
+    const paragraphs = safeText.split(/\r?\n/);
+    let fontSize = preferredSize;
+    let lines = paragraphs.flatMap((paragraph) => wrapText(thaiFont, paragraph, placement.width - 8, fontSize));
+    while (fontSize > 6 && lines.length * (fontSize + 2.2) > placement.height - 6) {
+      fontSize -= 0.3;
+      lines = paragraphs.flatMap((paragraph) => wrapText(thaiFont, paragraph, placement.width - 8, fontSize));
+    }
+    const maxLines = Math.max(1, Math.floor((placement.height - 6) / (fontSize + 2.2)));
+    lines.slice(0, maxLines).forEach((line, index) => {
+      page.drawText(line, {
+        x: placement.x + 4,
+        y: pageHeight - placement.top - fontSize - 3 - index * (fontSize + 2.2),
+        size: fontSize,
+        font: thaiFont,
+        color: rgb(0, 0, 0)
+      });
+    });
+  }
+
+  drawWrappedBox(
+    { x: 34, top: 173, width: 450, height: 72 },
+    [
+      `ชื่อป้าย ${page4State.signName}`,
+      `ที่อยู่ ${page4State.address}`,
+      `โทรศัพท์ ${page4State.phone}    โทรสาร ${page4State.fax}`
+    ].join("\n"),
+    9
+  );
+  drawWrappedBox(
+    { x: 34, top: 257, width: 430, height: 22 },
+    `ได้รับใบอนุญาตก่อสร้างจาก ${page4State.permitAuthority} เมื่อวันที่ ${page4State.permitDay} เดือน ${page4State.permitMonth} พ.ศ. ${page4State.permitYear}`,
+    8.6
+  );
+
+  redrawCheckbox(signInspectionPage4Checkboxes.hasPlan.centerX, signInspectionPage4Checkboxes.hasPlan.centerTop, page4State.planChoice === "has");
+  redrawCheckbox(signInspectionPage4Checkboxes.noPlan.centerX, signInspectionPage4Checkboxes.noPlan.centerTop, page4State.planChoice === "none");
+  redrawCheckbox(signInspectionPage4Checkboxes.noPermitData.centerX, signInspectionPage4Checkboxes.noPermitData.centerTop, page4State.permitChoice === "noData");
+  redrawCheckbox(signInspectionPage4Checkboxes.signAge.centerX, signInspectionPage4Checkboxes.signAge.centerTop, page4State.permitChoice === "age");
+  drawWrappedBox(
+    { x: 151, top: 375, width: 41, height: 19 },
+    page4State.permitChoice === "age" ? page4State.signAgeMonths : "",
+    8.8
+  );
+
+  const mapLocation = page4State.mapLocation;
+  const mapUrl = mapLocation.googleMapsUrl.trim();
+  const gpsText = mapLocation.latitude.trim() && mapLocation.longitude.trim()
+    ? `GPS พิกัด ${mapLocation.latitude.trim()}, ${mapLocation.longitude.trim()}`
+    : "";
+  drawWrappedBox({ x: 45, top: 421, width: 465, height: 18 }, mapUrl, 7.8);
+  drawWrappedBox({ x: 45, top: 437, width: 465, height: 18 }, gpsText, 8);
+
+  const annotations = page.node.Annots();
+  if (annotations) {
+    for (let index = annotations.size() - 1; index >= 0; index -= 1) {
+      const annotation = pdf.context.lookup(annotations.get(index), PDFDict);
+      const action = annotation?.lookup(PDFName.of("A"), PDFDict);
+      if (action?.get(PDFName.of("S"))?.toString() === "/URI") annotations.remove(index);
+    }
+  }
+  if (mapUrl) {
+    try {
+      const parsedUrl = new URL(mapUrl);
+      if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
+        const linkWidth = Math.min(460, thaiFont.widthOfTextAtSize(mapUrl, 7.8));
+        const linkAnnotation = pdf.context.obj({
+          Type: "Annot",
+          Subtype: "Link",
+          Rect: [49, 341, 49 + linkWidth, 357],
+          Border: [0, 0, 0],
+          A: { Type: "Action", S: "URI", URI: PDFString.of(mapUrl) }
+        });
+        page.node.addAnnot(pdf.context.register(linkAnnotation));
+      }
+    } catch {
+      // Keep invalid typed URLs visible without making them clickable.
+    }
+  }
+
+  const resources = page.node.Resources();
+  const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+  if (xObjects) {
+    const imageEdit = state.imageEdits[signInspectionPage4MapSlot.key];
+    const mapImageUrl = imageEdit?.objectUrl
+      || (mapLocation.mapImageSource === "capture" ? mapLocation.mapScreenshotUrl : mapLocation.uploadedImageUrl || mapLocation.mapScreenshotUrl);
+    if (mapImageUrl) {
+      const mapBytes = await imageUrlToCoverPngBytes(mapImageUrl, 1600, 718);
+      const mapImage = await pdf.embedPng(mapBytes);
+      xObjects.set(PDFName.of(signInspectionPage4MapSlot.xObjectName!), mapImage.ref);
+    }
+
+  }
+
+  // The SHERA mark is a separate image placed partly below the map. Cover the
+  // complete object (including its green border) after the original page is
+  // drawn so no transparency renderer can turn it into a black rectangle.
+  page.drawRectangle({
+    x: 32,
+    y: 20,
+    width: 198,
+    height: 108,
+    color: rgb(1, 1, 1)
+  });
+
+}
+
+async function replaceSignInspectionPage7Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[6];
+  if (!page) return;
+  const page7State = state.signInspectionPage7State;
+  if (!page7State) return;
+
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+  const { height: pageHeight } = page.getSize();
+
+  function redrawCheckbox(centerX: number, centerTop: number, selected: boolean) {
+    const centerY = pageHeight - centerTop;
+    page.drawRectangle({
+      x: centerX - 5.2,
+      y: centerY - 5.2,
+      width: 10.4,
+      height: 10.4,
+      color: rgb(1, 1, 1),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 0.65
+    });
+    if (selected) drawPage23CheckMark(page, centerX, centerY);
+  }
+
+  function drawTextBox(
+    placement: { x: number; top: number; width: number; height: number },
+    text: string,
+    preferredSize = 9.2
+  ) {
+    const bottom = pageHeight - placement.top - placement.height;
+    page.drawRectangle({
+      x: placement.x,
+      y: bottom,
+      width: placement.width,
+      height: placement.height,
+      color: rgb(1, 1, 1)
+    });
+
+    const safeText = text.trim();
+    if (!safeText) return;
+    const wrapParagraphs = (fontSize: number) => safeText
+      .split(/\r?\n/)
+      .flatMap((paragraph) => wrapText(thaiFont, paragraph, placement.width - 7, fontSize));
+    let fontSize = preferredSize;
+    let lines = wrapParagraphs(fontSize);
+    while (fontSize > 5.4 && lines.length * (fontSize + 2) > placement.height - 5) {
+      fontSize -= 0.3;
+      lines = wrapParagraphs(fontSize);
+    }
+    const maxLines = Math.max(1, Math.floor((placement.height - 5) / (fontSize + 2)));
+    lines.slice(0, maxLines).forEach((line, index) => {
+      page.drawText(line, {
+        x: placement.x + 3.5,
+        y: pageHeight - placement.top - fontSize - 3 - index * (fontSize + 2),
+        size: fontSize,
+        font: thaiFont,
+        color: rgb(0, 0, 0)
+      });
+    });
+  }
+
+  function contactText(contact: SignInspectionPage7Contact) {
+    return [
+      `ชื่อ ${contact.name.trim()}`,
+      `ที่อยู่ ${contact.address.trim()}`,
+      `โทรศัพท์ ${contact.phone.trim()}    โทรสาร ${contact.fax.trim()}`,
+      `อีเมล ${contact.email.trim()}`
+    ].join("\n");
+  }
+
+  function engineerText(group: SignInspectionPage7Group) {
+    return `ชื่อ ${group.engineerName.trim()}    ใบอนุญาตทะเบียนเลขที่ ${group.engineerLicense.trim()}`;
+  }
+
+  for (const option of signInspectionPage7TypeOptions) {
+    redrawCheckbox(option.centerX, option.centerTop, page7State.signTypes[option.key]);
+  }
+
+  // Clear the example text following “อื่น ๆ (ระบุ)” and draw only the user's value.
+  drawTextBox(
+    { x: 205, top: 136.5, width: 270, height: 19 },
+    page7State.signTypes.other ? page7State.otherTypeText : "",
+    8.6
+  );
+
+  const groundSelected = page7State.signTypes.ground;
+  const buildingSelected = hasBuildingMountedSign(page7State);
+  redrawCheckbox(
+    signInspectionPage7GroupCheckboxes.ground.centerX,
+    signInspectionPage7GroupCheckboxes.ground.centerTop,
+    groundSelected
+  );
+  redrawCheckbox(
+    signInspectionPage7GroupCheckboxes.building.centerX,
+    signInspectionPage7GroupCheckboxes.building.centerTop,
+    buildingSelected
+  );
+
+  // These white boxes also remove all company/example data embedded in the source PDF.
+  page.drawRectangle({
+    x: 227,
+    y: pageHeight - 241,
+    width: 287,
+    height: 18,
+    color: rgb(1, 1, 1)
+  });
+  drawTextBox(
+    { x: 56, top: 241, width: 414, height: 34 },
+    groundSelected ? page7State.ground.productText : ""
+  );
+  drawTextBox(
+    { x: 55, top: 291, width: 459, height: 86 },
+    groundSelected ? contactText(page7State.ground.signOwner) : "",
+    9.4
+  );
+  drawTextBox(
+    { x: 55, top: 391.5, width: 416, height: 20 },
+    groundSelected ? engineerText(page7State.ground) : "",
+    8.2
+  );
+
+  page.drawRectangle({
+    x: 227,
+    y: pageHeight - 465,
+    width: 290,
+    height: 18.5,
+    color: rgb(1, 1, 1)
+  });
+  drawTextBox(
+    { x: 58, top: 464.5, width: 400, height: 18 },
+    buildingSelected ? page7State.building.productText : ""
+  );
+  drawTextBox(
+    { x: 57, top: 497.5, width: 461, height: 86 },
+    buildingSelected ? contactText(page7State.building.signOwner) : "",
+    9.4
+  );
+  drawTextBox(
+    { x: 42, top: 598.5, width: 476, height: 86 },
+    buildingSelected ? contactText(page7State.building.buildingOwner) : "",
+    9.4
+  );
+  drawTextBox(
+    { x: 57, top: 698.5, width: 414, height: 20 },
+    buildingSelected ? engineerText(page7State.building) : "",
+    8.2
+  );
+
+}
+
+async function replaceSignInspectionPage8Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[7];
+  if (!page) return;
+  const page8State = state.signInspectionPage8State;
+  if (!page8State) return;
+  const { height: pageHeight } = page.getSize();
+
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+
+  function redrawCheckbox(centerX: number, centerTop: number, selected: boolean) {
+    const centerY = pageHeight - centerTop;
+    page.drawRectangle({
+      x: centerX - 5.2,
+      y: centerY - 5.2,
+      width: 10.4,
+      height: 10.4,
+      color: rgb(1, 1, 1),
+      borderColor: rgb(0, 0, 0),
+      borderWidth: 0.65
+    });
+    if (selected) drawPage23CheckMark(page, centerX, centerY);
+  }
+
+  function drawTextBox(
+    placement: { x: number; top: number; width: number; height: number },
+    text: string,
+    preferredSize = 9
+  ) {
+    const bottom = pageHeight - placement.top - placement.height;
+    page.drawRectangle({ x: placement.x, y: bottom, width: placement.width, height: placement.height, color: rgb(1, 1, 1) });
+    const safeText = text.trim();
+    if (!safeText) return;
+    const fontSize = fitFontSize(thaiFont, safeText, placement.width - 7, preferredSize);
+    page.drawText(safeText, {
+      x: placement.x + 3.5,
+      y: bottom + Math.max(3, (placement.height - fontSize) / 2),
+      size: fontSize,
+      font: thaiFont,
+      color: rgb(0, 0, 0)
+    });
+  }
+
+  for (const option of signInspectionPage8MaterialOptions) {
+    redrawCheckbox(option.centerX, option.centerTop, page8State.materials[option.key]);
+  }
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.signMaterial.centerX, signInspectionPage8UsageCheckboxes.signMaterial.centerTop, page8State.signMaterialEnabled);
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.sideCount.centerX, signInspectionPage8UsageCheckboxes.sideCount.centerTop, page8State.sideCountEnabled);
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.opening.centerX, signInspectionPage8UsageCheckboxes.opening.centerTop, page8State.openingEnabled);
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.openingYes.centerX, signInspectionPage8UsageCheckboxes.openingYes.centerTop, page8State.openingEnabled && page8State.openingChoice === "yes");
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.openingNo.centerX, signInspectionPage8UsageCheckboxes.openingNo.centerTop, page8State.openingEnabled && page8State.openingChoice === "no");
+  redrawCheckbox(signInspectionPage8UsageCheckboxes.other.centerX, signInspectionPage8UsageCheckboxes.other.centerTop, page8State.otherUsageEnabled);
+
+  drawTextBox({ x: 193, top: 200.5, width: 282, height: 19 }, page8State.materials.other ? page8State.otherMaterialText : "", 8.8);
+  drawTextBox({ x: 241, top: 251.5, width: 166, height: 18 }, page8State.signMaterialEnabled ? page8State.signMaterialText : "", 8.8);
+  drawTextBox({ x: 305, top: 268.5, width: 92, height: 18 }, page8State.sideCountEnabled ? page8State.sideCount : "", 9);
+  drawTextBox({ x: 212, top: 318.5, width: 193, height: 19 }, page8State.otherUsageEnabled ? page8State.otherUsageText : "", 8.8);
+
+  for (const slot of signInspectionPage8ImageSlots) {
+    const edit = state.imageEdits[slot.key];
+    if (!edit || !slot.xObjectName) continue;
+    const resources = page.node.Resources();
+    const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+    if (!xObjects) continue;
+    const imageBytes = await imageUrlToCoverPngBytes(edit.objectUrl, 1600, 1200);
+    const image = await pdf.embedPng(imageBytes);
+    xObjects.set(PDFName.of(slot.xObjectName), image.ref);
+  }
+
+}
+
+async function replaceSignInspectionPage9Values(pdf: PDFDocument, state: ReportRenderState) {
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+
+  for (const pageNumber of [9, 10, 11]) {
+    const page = pdf.getPages()[pageNumber - 1];
+    if (!page) continue;
+    const { height: pageHeight } = page.getSize();
+
+    function redrawCheckbox(centerX: number, centerTop: number, selected: boolean) {
+      const centerY = pageHeight - centerTop;
+      page.drawRectangle({
+        x: centerX - 5.5,
+        y: centerY - 5.5,
+        width: 11,
+        height: 11,
+        color: rgb(1, 1, 1),
+        borderColor: rgb(0, 0, 0),
+        borderWidth: 0.65
+      });
+      if (selected) drawPage23CheckMark(page, centerX, centerY);
+    }
+
+    function drawTextBox(
+      placement: { x: number; top: number; width: number; height: number },
+      text: string,
+      preferredSize = 7.4
+    ) {
+      const bottom = pageHeight - placement.top - placement.height;
+      page.drawRectangle({
+        x: placement.x,
+        y: bottom,
+        width: placement.width,
+        height: placement.height,
+        color: rgb(1, 1, 1)
+      });
+
+      const safeText = text.trim();
+      if (!safeText) return;
+      let fontSize = preferredSize;
+      let lines = wrapText(thaiFont, safeText, placement.width - 7, fontSize);
+      while (fontSize > 5.8 && lines.length * (fontSize + 2) > placement.height - 5) {
+        fontSize -= 0.4;
+        lines = wrapText(thaiFont, safeText, placement.width - 7, fontSize);
+      }
+      const maxLines = Math.max(1, Math.floor((placement.height - 5) / (fontSize + 2)));
+      lines.slice(0, maxLines).forEach((line, index) => {
+        page.drawText(line, {
+          x: placement.x + 3.5,
+          y: pageHeight - placement.top - fontSize - 3 - index * (fontSize + 2),
+          size: fontSize,
+          font: thaiFont,
+          color: rgb(0, 0, 0)
+        });
+      });
+    }
+
+    for (const section of signInspectionPage9Sections.filter((item) => item.page === pageNumber)) {
+      const value = state.signInspectionPage9State?.[section.key];
+      redrawCheckbox(section.changeCheckboxes.none.centerX, section.changeCheckboxes.none.centerTop, value?.changeChoice === "none");
+      redrawCheckbox(section.changeCheckboxes.changed.centerX, section.changeCheckboxes.changed.centerTop, value?.changeChoice === "changed");
+      redrawCheckbox(section.opinionCheckboxes.usable.centerX, section.opinionCheckboxes.usable.centerTop, value?.opinion === "usable");
+      redrawCheckbox(section.opinionCheckboxes.unusable.centerX, section.opinionCheckboxes.unusable.centerTop, value?.opinion === "unusable");
+      redrawCheckbox(section.otherCheckbox.centerX, section.otherCheckbox.centerTop, value?.otherEnabled === true);
+
+      drawTextBox(section.changeDetailsBox, value?.changeChoice === "changed" ? value.changeDetails : "");
+      drawTextBox(section.opinionDetailsBox, value?.opinionDetails ?? "");
+      drawTextBox(section.otherTextBox, value?.otherEnabled ? value.otherText : "");
+    }
+
+  }
+}
+
+async function replaceSignInspectionPage13Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[12];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+  const cells = [
+    { field: "presence", choice: "yes", bounds: signInspectionPage13Columns.presence.yes },
+    { field: "presence", choice: "no", bounds: signInspectionPage13Columns.presence.no },
+    { field: "wear", choice: "yes", bounds: signInspectionPage13Columns.wear.yes },
+    { field: "wear", choice: "no", bounds: signInspectionPage13Columns.wear.no },
+    { field: "damage", choice: "yes", bounds: signInspectionPage13Columns.damage.yes },
+    { field: "damage", choice: "no", bounds: signInspectionPage13Columns.damage.no },
+    { field: "result", choice: "usable", bounds: signInspectionPage13Columns.result.usable },
+    { field: "result", choice: "unusable", bounds: signInspectionPage13Columns.result.unusable }
+  ] as const;
+
+  for (const row of signInspectionPage13Rows) {
+    const centerY = pageHeight - row.centerTop;
+    for (const cell of cells) {
+      const [left, right] = cell.bounds;
+      page.drawRectangle({
+        x: left + 1,
+        y: centerY - 7,
+        width: right - left - 2,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+    const rowState = state.signInspectionPage13State?.[row.key];
+    if (!rowState) continue;
+    for (const cell of cells) {
+      if (rowState[cell.field] !== cell.choice) continue;
+      const [left, right] = cell.bounds;
+      drawPage23CheckMark(page, (left + right) / 2, centerY);
+    }
+  }
+
+  // Keep the additional-details area completely blank while preserving the signature below it.
+  page.drawRectangle({ x: 33, y: 58, width: 491, height: 91, color: rgb(1, 1, 1) });
+
+}
+
+async function replaceSignInspectionPage12Values(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[11];
+  if (!page) return;
+  const { height: pageHeight } = page.getSize();
+  const cells = [
+    { field: "presence", choice: "yes", bounds: signInspectionPage13Columns.presence.yes },
+    { field: "presence", choice: "no", bounds: signInspectionPage13Columns.presence.no },
+    { field: "wear", choice: "yes", bounds: signInspectionPage13Columns.wear.yes },
+    { field: "wear", choice: "no", bounds: signInspectionPage13Columns.wear.no },
+    { field: "damage", choice: "yes", bounds: signInspectionPage13Columns.damage.yes },
+    { field: "damage", choice: "no", bounds: signInspectionPage13Columns.damage.no },
+    { field: "result", choice: "usable", bounds: signInspectionPage13Columns.result.usable },
+    { field: "result", choice: "unusable", bounds: signInspectionPage13Columns.result.unusable }
+  ] as const;
+
+  for (const row of signInspectionPage12Rows) {
+    const centerY = pageHeight - row.centerTop;
+    for (const cell of cells) {
+      const [left, right] = cell.bounds;
+      page.drawRectangle({
+        x: left + 1,
+        y: centerY - 7,
+        width: right - left - 2,
+        height: 14,
+        color: rgb(1, 1, 1)
+      });
+    }
+    const rowState = state.signInspectionPage12State?.[row.key];
+    if (!rowState) continue;
+    for (const cell of cells) {
+      if (rowState[cell.field] !== cell.choice) continue;
+      const [left, right] = cell.bounds;
+      drawPage23CheckMark(page, (left + right) / 2, centerY);
+    }
+  }
+
+  page.drawRectangle({ x: 33, y: 58, width: 491, height: 91, color: rgb(1, 1, 1) });
+
+}
+
+async function replaceSignInspectionCoverValues(pdf: PDFDocument, state: ReportRenderState) {
+  const page = pdf.getPages()[1];
+  if (!page) return;
+
+  const coverEdit = state.imageEdits[signInspectionCoverImageSlot.key];
+  if (coverEdit && signInspectionCoverImageSlot.xObjectName) {
+    const resources = page.node.Resources();
+    const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+    if (xObjects) {
+      const imageBytes = await imageUrlToCoverPngBytes(coverEdit.objectUrl, 1600, 1200);
+      const image = await pdf.embedPng(imageBytes);
+      xObjects.set(PDFName.of(signInspectionCoverImageSlot.xObjectName), image.ref);
+    }
+  }
+
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+  const darkBlue = rgb(39 / 255, 91 / 255, 130 / 255);
+  const lightGreen = rgb(126 / 255, 199 / 255, 55 / 255);
+
+  // Replace the original Hotline/right-logo header with the compact left logo.
+  page.drawRectangle({ x: 20, y: 704, width: 500, height: 70, color: rgb(1, 1, 1) });
+  const headerLogoResponse = await fetch("/templates/assets/test-true-header-logo3.png");
+  if (headerLogoResponse.ok) {
+    const headerLogo = await pdf.embedPng(await headerLogoResponse.arrayBuffer());
+    page.drawImage(headerLogo, { x: 31, y: 711, width: 112, height: 63 });
+  }
+
+  const yearSuffix = (
+    state.fieldValues[signInspectionCoverFieldKeys.yearSuffix]
+      ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.yearSuffix]
+  ).replace(/\D/g, "").slice(0, 2);
+  const yearText = `25${yearSuffix}`;
+  const yearBox = { x: 319, y: 528, width: 193, height: 77 };
+  page.drawRectangle({ ...yearBox, color: rgb(1, 1, 1) });
+  let yearSize = 78;
+  while (yearSize > 68 && thaiFont.widthOfTextAtSize(yearText, yearSize) > yearBox.width - 4) {
+    yearSize -= 2;
+  }
+  const yearWidth = thaiFont.widthOfTextAtSize(yearText, yearSize);
+  page.drawText(yearText, {
+    x: yearBox.x + (yearBox.width - yearWidth) / 2,
+    y: 532,
+    size: yearSize,
+    font: thaiFont,
+    color: lightGreen
+  });
+
+  const description = (
+    state.fieldValues[signInspectionCoverFieldKeys.description]
+      ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.description]
+  ).trim();
+  const descriptionBox = { x: 28, y: 67, width: 484, height: 87 };
+  page.drawRectangle({ ...descriptionBox, color: rgb(1, 1, 1) });
+  let descriptionSize = 20;
+  let descriptionLines: string[] = [];
+  do {
+    descriptionLines = description
+      .split(/\r?\n/)
+      .flatMap((line) => wrapText(thaiFont, line.trim(), descriptionBox.width - 8, descriptionSize))
+      .filter(Boolean);
+    if (descriptionLines.length <= 2) break;
+    descriptionSize -= 0.5;
+  } while (descriptionSize > 13);
+  descriptionLines = descriptionLines.slice(0, 2);
+  const lineYs = descriptionLines.length === 1 ? [101] : [116, 75];
+  descriptionLines.forEach((line, index) => {
+    const textWidth = thaiFont.widthOfTextAtSize(line, descriptionSize);
+    page.drawText(line, {
+      x: descriptionBox.x + (descriptionBox.width - textWidth) / 2,
+      y: lineYs[index],
+      size: descriptionSize,
+      font: thaiFont,
+      color: darkBlue
+    });
+  });
+
+}
+
 export async function createReportPdf(state: ReportRenderState, targetPage?: number) {
+  if (state.templateId === "sign-maintenance-plan") {
+    const template = getReportTemplate(state.templateId);
+    const templateBytes = await fetch(template.pdfUrl).then((response) => {
+      if (!response.ok) throw new Error("ไม่สามารถโหลด PDF แผนบำรุงรักษาป้ายได้");
+      return response.arrayBuffer();
+    });
+    const pdf = await PDFDocument.load(templateBytes);
+    await replaceSignMaintenancePlanValues(pdf, state);
+    await replaceTemplateHeaderYears(pdf, [3, 4, 5, 6, 7]);
+
+    if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
+      const previewPdf = await PDFDocument.create();
+      const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
+      previewPdf.addPage(copiedPage);
+      return previewPdf.save();
+    }
+    return pdf.save();
+  }
+
+  if (state.templateId === "mixing-workshop-maintenance-plan") {
+    const template = getReportTemplate(state.templateId);
+    const templateBytes = await fetch(template.pdfUrl).then((response) => {
+      if (!response.ok) throw new Error(`ไม่สามารถโหลด PDF ${template.name} ได้`);
+      return response.arrayBuffer();
+    });
+    const pdf = await PDFDocument.load(templateBytes);
+    pdf.registerFontkit(fontkit);
+    const fontBytes = await getTahomaFontBuffer();
+    const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+    // Page 14 is fixed to the original inspection-frequency table.
+    // Keep every original checkmark instead of replacing it with draft values.
+    // Page 15 is fixed to the original table; only remove the inspection date.
+    removeMixingWorkshopPage15InspectionDate(pdf);
+    // Page 35 keeps the original summary table; only remove the inspection date.
+    removeMixingWorkshopPage35InspectionDate(pdf);
+    // Pages 23-32 keep their original tables and values from the template.
+    replaceMixingWorkshopPages34To35Values(pdf, state, thaiFont);
+    await replaceTemplateHeaderYears(pdf, Array.from({ length: 34 }, (_, index) => index + 2));
+
+    if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
+      const previewPdf = await PDFDocument.create();
+      const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
+      previewPdf.addPage(copiedPage);
+      return previewPdf.save();
+    }
+    return pdf.save();
+  }
+
+  if (state.templateId === "sign-inspection-report") {
+    const template = getReportTemplate(state.templateId);
+    const templateBytes = await fetch(template.pdfUrl).then((response) => {
+      if (!response.ok) throw new Error(`ไม่สามารถโหลด PDF ${template.name} ได้`);
+      return response.arrayBuffer();
+    });
+    const pdf = await PDFDocument.load(templateBytes);
+    await replaceSignInspectionCoverValues(pdf, state);
+    await replaceSignInspectionPage4Values(pdf, state);
+    await replaceSignInspectionPages5To6Images(pdf, state);
+    await replaceSignInspectionPage7Values(pdf, state);
+    await replaceSignInspectionPage8Values(pdf, state);
+    await replaceSignInspectionPage9Values(pdf, state);
+    await replaceSignInspectionPage12Values(pdf, state);
+    await replaceSignInspectionPage13Values(pdf, state);
+    await replaceSignInspectionPage14Images(pdf, state);
+    await replaceSignInspectionPage15Values(pdf, state);
+    await replaceTemplateHeaderYears(pdf, Array.from({ length: 13 }, (_, index) => index + 3));
+
+    if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
+      const previewPdf = await PDFDocument.create();
+      const [copiedPage] = await previewPdf.copyPages(pdf, [targetPage - 1]);
+      previewPdf.addPage(copiedPage);
+      return previewPdf.save();
+    }
+    return pdf.save();
+  }
+
+  if (state.templateId !== "annual-inspection" && state.templateId !== "maintenance-plan") {
+    const template = getReportTemplate(state.templateId);
+    const templateBytes = await fetch(template.pdfUrl).then((response) => {
+      if (!response.ok) throw new Error(`ไม่สามารถโหลด PDF ${template.name} ได้`);
+      return response.arrayBuffer();
+    });
+
+    if (targetPage) {
+      const sourcePdf = await PDFDocument.load(templateBytes);
+      if (targetPage < 1 || targetPage > sourcePdf.getPageCount()) {
+        throw new Error(`ไม่พบหน้าที่ ${targetPage} ใน PDF ${template.name}`);
+      }
+      const previewPdf = await PDFDocument.create();
+      const [copiedPage] = await previewPdf.copyPages(sourcePdf, [targetPage - 1]);
+      previewPdf.addPage(copiedPage);
+      return previewPdf.save();
+    }
+
+    return new Uint8Array(templateBytes);
+  }
+
   if (state.templateId === "maintenance-plan") {
     try {
       const templateBytes = await fetch("/templates/building-maintenance-plan.pdf").then((response) => {
@@ -3179,7 +4857,11 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     }
 
     if (!targetPage || targetPage === 26) {
-      await executeStep("หน้า 26 (Signatures)", () => replacePage25Signatures(pdf, state));
+      await executeStep("หน้า 26 (Assessment Summary)", () => replaceAnnualAssessmentPage(pdf, state));
+    }
+
+    if (!targetPage || (targetPage >= 23 && targetPage <= 26)) {
+      await executeStep("หน้า 23-26 (Footer Page Numbers)", () => replaceAnnualFooterPageNumbers(pdf));
     }
 
     if (!targetPage || targetPage === 12 || targetPage === 13) {

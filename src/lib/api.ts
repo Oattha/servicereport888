@@ -1,4 +1,12 @@
-import type { SharedReport, UserRecord, UserRole, UserStatus } from "../types";
+import type {
+  CompanyHistory,
+  CompanySearchResult,
+  ReportRenderState,
+  SharedReport,
+  UserRecord,
+  UserRole,
+  UserStatus
+} from "../types";
 import { requestJson, setAuthToken } from "./http";
 
 export type CreateUserInput = {
@@ -66,7 +74,17 @@ export type CompleteReportInput = {
   templatePages: number;
   inspectionDate: string;
   inspectorId?: string;
+  selectedCompanyId?: string;
+  data?: ReportRenderState;
 };
+
+export function searchCompanies(query: string) {
+  return requestJson<CompanySearchResult[]>(`/api/companies/search?q=${encodeURIComponent(query)}`);
+}
+
+export function getCompanyHistory(companyId: string) {
+  return requestJson<CompanyHistory>(`/api/companies/${encodeURIComponent(companyId)}/history`);
+}
 
 export function getReports() {
   return requestJson<SharedReport[]>('/api/reports');

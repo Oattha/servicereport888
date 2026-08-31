@@ -1,26 +1,36 @@
-import { Building2, ClipboardCheck, ShieldCheck, Wrench, BarChart3 } from "lucide-react";
+import { Building2, ClipboardCheck, ShieldCheck, Wrench, BarChart3, Headphones, FileText, Clock3 } from "lucide-react";
 import { LoginForm } from "../components/LoginForm";
 import { BrandLogo } from "../components/BrandLogo";
 
-const features = [
+const buildingFeatures = [
   { label: "ตรวจสอบอาคาร", icon: ClipboardCheck },
   { label: "บำรุงรักษา", icon: Wrench },
   { label: "ความปลอดภัย", icon: ShieldCheck },
   { label: "รายงานและสรุปผล", icon: BarChart3 }
 ];
 
+const serviceFeatures = [
+  { label: "รับแจ้งบริการ", icon: Headphones },
+  { label: "ติดตามงาน", icon: Clock3 },
+  { label: "บันทึกการบริการ", icon: Wrench },
+  { label: "รายงานและสรุปผล", icon: FileText }
+];
+
 type LoginPageProps = {
   onLogin: (remember: boolean) => void;
+  system?: "building" | "service";
 };
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, system = "building" }: LoginPageProps) {
+  const isService = system === "service";
+  const features = isService ? serviceFeatures : buildingFeatures;
   return (
     <main className="login-page">
-      <section className="hero-panel" aria-label="ระบบรายงานการตรวจสอบอาคาร">
+      <section className="hero-panel" aria-label={isService ? "ระบบรายงานการบริการ" : "ระบบรายงานการตรวจสอบอาคาร"}>
         <div className="hero-content">
           <div className="hero-title-group">
-            <h1>ระบบรายงานการตรวจสอบอาคาร</h1>
-            <p>และแผนปฏิบัติการตรวจบำรุงรักษาบริษัท</p>
+            <h1>{isService ? "ระบบรายงานการบริการ" : "ระบบรายงานการตรวจสอบอาคาร"}</h1>
+            <p>{isService ? "จัดการ ติดตาม และสรุปรายงานการให้บริการ" : "และแผนปฏิบัติการตรวจบำรุงรักษาบริษัท"}</p>
             <span className="title-line" aria-hidden="true" />
           </div>
 
@@ -35,7 +45,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         </div>
 
         <div className="building-card" aria-hidden="true">
-          <Building2 size={420} strokeWidth={1.05} />
+          {isService
+            ? <Headphones size={420} strokeWidth={1.05} />
+            : <Building2 size={420} strokeWidth={1.05} />}
         </div>
         <div className="scan-ring scan-ring-large" aria-hidden="true" />
         <div className="scan-ring scan-ring-small" aria-hidden="true" />

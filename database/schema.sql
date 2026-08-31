@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(240) NOT NULL,
+  normalized_name VARCHAR(240),
   contact_name VARCHAR(160),
   phone VARCHAR(40),
   email VARCHAR(180),
@@ -62,15 +63,22 @@ CREATE TABLE IF NOT EXISTS reports (
   inspection_date DATE,
   recipient_email VARCHAR(180),
   email_sent_at TIMESTAMPTZ,
+  data JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(180);
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS data JSONB;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(240);
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 CREATE INDEX IF NOT EXISTS idx_reports_customer_id ON reports(customer_id);
 CREATE INDEX IF NOT EXISTS idx_reports_building_id ON reports(building_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_normalized_name_unique
+  ON customers(normalized_name)
+  WHERE normalized_name IS NOT NULL AND normalized_name <> '';
+CREATE INDEX IF NOT EXISTS idx_buildings_customer_id_name ON buildings(customer_id, name);

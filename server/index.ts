@@ -1,3 +1,5 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import cors from "cors";
 import express from "express";
 import bcrypt from "bcryptjs";
@@ -652,15 +654,12 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
       return response.status(400).json({ message: "ไม่พบไฟล์ PDF สำหรับส่งอีเมล" });
     }
 
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = Number(process.env.SMTP_PORT ?? 587);
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM ?? smtpUser;
+    const brevoApiKey = process.env.BREVO_API_KEY;
+    const senderEmail = process.env.SMTP_FROM || "simonnazaa@gmail.com";
 
-    if (!smtpHost || !smtpUser || !smtpPass || !smtpFrom) {
+    if (!brevoApiKey) {
       return response.status(503).json({
-        message: "ยังไม่ได้ตั้งค่าระบบส่งอีเมล กรุณากำหนด SMTP_HOST, SMTP_USER, SMTP_PASS และ SMTP_FROM"
+        message: "ยังไม่ได้ตั้งค่า BREVO_API_KEY ในระบบ"
       });
     }
 
@@ -680,29 +679,43 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
       return response.status(404).json({ message: "ไม่พบรายงานที่ต้องการส่ง" });
     }
 
-    const attachment = Buffer.from(pdfBase64, "base64");
-    if (attachment.length === 0 || attachment.length > 25 * 1024 * 1024) {
-      return response.status(400).json({ message: "ไฟล์ PDF ไม่ถูกต้องหรือมีขนาดเกิน 25 MB" });
+    const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+
+    const payload: Record<string, unknown> = {
+      sender: { name: "TEST TRUE", email: senderEmail },
+      to: [{ email: normalizedEmail }],
+      subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
+      textContent: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
+      attachment: [
+        {
+          name: fileName.trim(),
+          content: cleanBase64,
+        },
+      ],
+    };
+
+    if (normalizedCc) {
+      payload.cc = [{ email: normalizedCc }];
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: false,
-      auth: { user: smtpUser, pass: smtpPass },
-      tls: {
-        rejectUnauthorized: false
-      }
+    const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    await transporter.sendMail({
-      from: smtpFrom,
-      to: normalizedEmail,
-      cc: normalizedCc || undefined,
-      subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
-      text: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
-      attachments: [{ filename: fileName.trim(), content: attachment, contentType: "application/pdf" }]
-    });
+    const brevoData = await brevoResponse.json();
+
+    if (!brevoResponse.ok) {
+      console.error("[Brevo API Error]", brevoData);
+      return response.status(502).json({
+        message: (brevoData as { message?: string }).message || "ส่งอีเมลผ่าน Brevo API ไม่สำเร็จ"
+      });
+    }
 
     const sentAt = new Date();
     await pool.query(
@@ -710,10 +723,15 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
       [request.params.id, normalizedEmail, sentAt]
     );
 
-    return response.json({ ok: true, recipientEmail: normalizedEmail, ccEmail: normalizedCc, sentAt: sentAt.toISOString() });
+    return response.json({
+      ok: true,
+      recipientEmail: normalizedEmail,
+      ccEmail: normalizedCc,
+      sentAt: sentAt.toISOString()
+    });
   } catch (error) {
     console.error("[Send report email failed]", error);
-    return response.status(502).json({ message: "ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า SMTP แล้วลองอีกครั้ง" });
+    return response.status(502).json({ message: "ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
   }
 });
 

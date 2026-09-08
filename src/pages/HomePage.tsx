@@ -54,7 +54,14 @@ export function HomePage({ onBuildingLogin, onServiceLogin }: HomePageProps) {
 
         <div className="system-card-grid">
           {systems.map(({ key, title, description, icon: Icon, accentIcon: AccentIcon, action, tone }) => {
-            const onLogin = key === "building" ? onBuildingLogin : onServiceLogin;
+            const onLogin =
+  key === "building"
+    ? onBuildingLogin
+    : () => {
+        window.location.href = "https://report-service-react-frontend.vercel.app/";
+        // หรือถ้าต้องการให้เปิดแท็บใหม่:
+        // window.open("https://report-service-react-frontend.vercel.app/", "_blank", "noopener,noreferrer");
+      };
             return (
               <article className={`system-card system-card-${tone}`} key={key}>
                 <div className="system-card-icon" aria-hidden="true">

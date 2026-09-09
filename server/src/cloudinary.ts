@@ -1,14 +1,22 @@
-import process from "node:process";
+import dotenv from "dotenv";
+dotenv.config();
+
 import { v2 as cloudinary } from "cloudinary";
 
-// SDK จะดึง process.env.CLOUDINARY_URL มาใช้งานให้อัตโนมัติ
 cloudinary.config();
 
-export async function uploadToCloudinary(fileBuffer: Buffer): Promise<string> {
+export function uploadToCloudinary(buffer: Buffer, mimetype?: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    // ถ้าเป็น PDF บังคับใช้ raw เพื่อให้เปิดอ่าน/ดาวน์โหลดได้ทันทีโดยไม่ติด 401
+    // ถ้าไม่ใช่ PDF (เช่น รูปภาพ jpg/png) ให้ใช้ auto ตามเดิม
+    const resourceType = mimetype === "application/pdf" ? "raw" : "auto";
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: "servicereport-uploads",
+        resource_type: resourceType,
+        type: "upload",
+        access_mode: "public"
       },
       (error, result) => {
         if (error || !result) {
@@ -17,7 +25,6 @@ export async function uploadToCloudinary(fileBuffer: Buffer): Promise<string> {
         resolve(result.secure_url);
       }
     );
-
-    uploadStream.end(fileBuffer);
+    uploadStream.end(buffer);
   });
 }

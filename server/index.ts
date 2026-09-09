@@ -351,20 +351,23 @@ app.get("/api/companies/:id/history", authMiddleware, async (request, response) 
       ),
       pool.query(
         `
-          SELECT
-            reports.id,
-            reports.report_no AS "reportNo",
-            reports.status,
-            reports.progress,
-            reports.inspection_date AS "inspectionDate",
-            reports.recipient_email AS "recipientEmail",
-            reports.data,
-            reports.created_at AS "createdAt",
-            reports.updated_at AS "updatedAt",
-            COALESCE(buildings.name, '-') AS building,
-            buildings.address AS "buildingAddress",
-            COALESCE(report_templates.name, '-') AS template
-          FROM reports
+        SELECT
+          reports.id,
+          reports.report_no AS "reportNo",
+          COALESCE(customers.name, '-') AS customer,
+          COALESCE(buildings.name, '-') AS building,
+          COALESCE(report_templates.name, '-') AS template,
+          COALESCE(users.full_name, 'User') AS inspector,
+          reports.status,
+          reports.progress,
+          reports.recipient_email AS "recipientEmail",  
+          reports.email_sent_at AS "emailSentAt",      
+          reports.signed_pdf_url AS "signedPdfUrl",
+          reports.customer_remarks AS "customerRemarks",
+          reports.sign_token AS "signToken",
+          reports.updated_at AS "updatedAt",
+          reports.data
+        FROM reports
           LEFT JOIN buildings ON buildings.id = reports.building_id
           LEFT JOIN report_templates ON report_templates.id = reports.template_id
           WHERE reports.customer_id = ANY($1::uuid[])
@@ -414,6 +417,9 @@ app.get("/api/reports", authMiddleware, async (_request, response) => {
           reports.progress,
           reports.recipient_email AS "recipientEmail",  
           reports.email_sent_at AS "emailSentAt",      
+          reports.signed_pdf_url AS "signedPdfUrl",
+          reports.customer_remarks AS "customerRemarks",
+          reports.sign_token AS "signToken",
           reports.updated_at AS "updatedAt",
           reports.data
         FROM reports
@@ -632,11 +638,22 @@ app.post("/api/reports", authMiddleware, async (request, response) => {
 
 app.post("/api/reports/:id/email", authMiddleware, async (request, response) => {
   try {
-    const { recipientEmail, ccEmail, fileName, pdfBase64 } = request.body as {
+    const { 
+      recipientEmail, 
+      ccEmail, 
+      fileName, 
+      pdfBase64,
+      subject,
+      messageBody,
+      signOff
+    } = request.body as {
       recipientEmail?: string;
       ccEmail?: string;
       fileName?: string;
       pdfBase64?: string;
+      subject?: string;
+      messageBody?: string;
+      signOff?: string;
     };
 
     const normalizedEmail = recipientEmail?.trim().toLowerCase() ?? "";
@@ -655,7 +672,9 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
     }
 
     const brevoApiKey = process.env.BREVO_API_KEY;
-    const senderEmail = process.env.SMTP_FROM || "simonnazaa@gmail.com";
+    const senderEmail = (process.env.SMTP_FROM || "simonnazaa@gmail.com")
+      .replace(/[<>]/g, "")
+      .trim();
 
     if (!brevoApiKey) {
       return response.status(503).json({
@@ -679,13 +698,60 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
       return response.status(404).json({ message: "ไม่พบรายงานที่ต้องการส่ง" });
     }
 
+    // สร้าง Token สุ่มสำหรับลิงก์ Portal
+    const signTokenStr = randomUUID().replace(/-/g, "");
+
     const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "");
+
+    // ลิงก์ Portal
+    const portalUrl = `https://servicereport.pages.dev/sign-portal?token=${signTokenStr}`;
+
+    const finalSubject = subject?.trim() || `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`;
+    const finalBody = messageBody?.trim() || `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้`;
+    const finalSignOff = signOff?.trim() || "TEST TRUE";
+
+    // สำหรับไคลเอนต์อีเมลที่ไม่รองรับ HTML
+    const fullTextContent = `${finalBody}\n\nท่านสามารถตรวจสอบและอัปโหลดเอกสารที่เซ็นรับรองแล้วได้ที่ลิงก์นี้:\n${portalUrl}\n\n${finalSignOff}`;
+
+    // สร้าง HTML Template พร้อมปุ่มกด Action
+    const formattedHtmlBody = finalBody.replace(/\n/g, "<br/>");
+    const formattedHtmlSignOff = finalSignOff.replace(/\n/g, "<br/>");
+
+    const fullHtmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #1e293b; line-height: 1.6;">
+        <div style="margin-bottom: 24px;">
+          <h2 style="color: #0f172a; margin: 0 0 12px 0;">${finalSubject}</h2>
+          <p style="font-size: 15px; color: #334155; margin: 0 0 20px 0;">
+            ${formattedHtmlBody}
+          </p>
+        </div>
+
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+          <p style="font-size: 14px; color: #64748b; margin: 0 0 14px 0;">
+            เมื่อท่านตรวจสอบเอกสาร PDF ที่แนบมาแล้ว กรุณาคลิกปุ่มด้านล่างเพื่อเซ็นหรือส่งคืนเอกสาร
+          </p>
+          <a href="${portalUrl}" target="_blank" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
+            เข้าสู่หน้ารับรองและส่งคืนรายงาน
+          </a>
+        </div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 24px; font-size: 14px; color: #475569;">
+          ${formattedHtmlSignOff}
+        </div>
+      </div>
+    `;
 
     const payload: Record<string, unknown> = {
       sender: { name: "TEST TRUE", email: senderEmail },
       to: [{ email: normalizedEmail }],
-      subject: `รายงานตรวจสอบอาคาร ${report.building ?? report.report_no}`,
-      textContent: `เรียนลูกค้า\n\nกรุณาตรวจสอบรายงานของ ${report.customer ?? "ลูกค้า"} ตามไฟล์ PDF ที่แนบมาพร้อมอีเมลนี้\n\nTEST TRUE`,
+      subject: finalSubject,
+      textContent: fullTextContent,
+      htmlContent: fullHtmlContent,
+      // ปิด Click Tracking ของ Brevo เพื่อไม่ให้แปลงเป็นลิงก์ sendibt2.com
+      headers: {
+        "X-Mailin-Tag": "no-track",
+        "X-Mailin-Custom": "click-tracking:off"
+      },
       attachment: [
         {
           name: fileName.trim(),
@@ -719,8 +785,10 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
 
     const sentAt = new Date();
     await pool.query(
-      `UPDATE reports SET status = 'sent', recipient_email = $2, email_sent_at = $3, updated_at = NOW() WHERE id = $1`,
-      [request.params.id, normalizedEmail, sentAt]
+      `UPDATE reports 
+       SET status = 'sent', recipient_email = $2, email_sent_at = $3, sign_token = $4, updated_at = NOW() 
+       WHERE id = $1`,
+      [request.params.id, normalizedEmail, sentAt, signTokenStr]
     );
 
     return response.json({
@@ -732,6 +800,75 @@ app.post("/api/reports/:id/email", authMiddleware, async (request, response) => 
   } catch (error) {
     console.error("[Send report email failed]", error);
     return response.status(502).json({ message: "ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" });
+  }
+});
+
+// ดึงข้อมูลรายงานผ่าน signToken สำหรับหน้า Portal
+app.get("/api/portal/reports/:token", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT reports.id, reports.report_no AS "reportNo", reports.status,
+               reports.signed_pdf_url AS "signedPdfUrl", reports.signed_at AS "signedAt",
+               customers.name AS customer, buildings.name AS building
+        FROM reports
+        LEFT JOIN customers ON customers.id = reports.customer_id
+        LEFT JOIN buildings ON buildings.id = reports.building_id
+        WHERE reports.sign_token = $1
+        LIMIT 1
+      `,
+      [req.params.token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "ไม่พบเอกสารหรือลิงก์หมดอายุ" });
+    }
+
+    return res.json(result.rows[0]);
+  } catch (err) {
+    return res.status(500).json({ message: "เกิดข้อผิดพลาดในการดึงข้อมูล" });
+  }
+});
+
+// รับอัปโหลดไฟล์ที่เซ็นแล้วจากหน้า Portal พร้อมข้อความเพิ่มเติม
+app.post("/api/portal/reports/:token/upload", upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "กรุณาแนบไฟล์เอกสาร" });
+    }
+
+    const remarks = typeof req.body?.remarks === "string" ? req.body.remarks.trim() : "";
+
+    const reportResult = await pool.query(
+      `SELECT id FROM reports WHERE sign_token = $1 LIMIT 1`,
+      [req.params.token]
+    );
+
+    if (reportResult.rows.length === 0) {
+      return res.status(404).json({ message: "ไม่พบเอกสารหรือลิงก์หมดอายุ" });
+    }
+
+    // อัปโหลดไฟล์ขึ้น Cloudinary
+    const fileUrl = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
+
+    // อัปเดตสถานะเป็น signed พร้อมบันทึก URL และ customer_remarks
+    await pool.query(
+      `
+        UPDATE reports 
+        SET status = 'signed', 
+            signed_pdf_url = $2, 
+            customer_remarks = $3,
+            signed_at = NOW(), 
+            updated_at = NOW() 
+        WHERE id = $1
+      `,
+      [reportResult.rows[0].id, fileUrl, remarks || null]
+    );
+
+    return res.json({ ok: true, fileUrl });
+  } catch (err) {
+    console.error("[Portal Upload Error]", err);
+    return res.status(500).json({ message: "อัปโหลดเอกสารไม่สำเร็จ" });
   }
 });
 
@@ -787,8 +924,7 @@ app.post("/api/upload", authMiddleware, upload.single("file"), async (req, res) 
     }
 
     // เรียกใช้ Cloudinary
-    const imageUrl = await uploadToCloudinary(req.file.buffer);
-
+    const imageUrl = await uploadToCloudinary(req.file.buffer, req.file.mimetype);
     return res.json({ url: imageUrl });
   } catch (error) {
     console.error("[Upload error]", error);

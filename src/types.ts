@@ -49,7 +49,7 @@ import type {
 
 export type AppSection = "reports" | "my-reports" | "all-reports" | "users";
 
-export type ReportStatus = "Draft" | "In Review" | "Ready" | "Sent";
+export type ReportStatus = "draft" | "in_review" | "ready" | "sent" | "signed";
 
 export type Report = {
   id: string;
@@ -66,13 +66,16 @@ export type SharedReport = {
   id: string;
   reportNo: string;
   customer: string;
+  customerRemarks?: string | null;
   building: string;
   template: string;
   inspector: string;
-  status: "draft" | "in_review" | "ready" | "sent";
+  status: "draft" | "in_review" | "ready" | "sent" | "signed";
   progress: number;
   recipientEmail?: string | null; 
   emailSentAt?: string | null;    
+  signedPdfUrl?: string | null;
+  signToken?: string | null;
   updatedAt: string;
   data?: ReportRenderState | null;
 };

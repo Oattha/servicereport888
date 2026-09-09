@@ -3605,37 +3605,54 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       </div>
 
       <aside className="preview-panel">
-        <div className="preview-header">
-          <strong>ตัวอย่างรายงาน (Preview)</strong>
-          <div>
-            <button
-              className="secondary-action small-action"
-              type="button"
-              onClick={() => setIsPreviewFullScreen((current) => !current)}
-            >
-              <Expand size={16} aria-hidden="true" />
-              {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
-            </button>
+<div className="preview-header">
+  <strong>ตัวอย่างรายงาน (Preview)</strong>
+  <div className="preview-header-actions">
+    <div className="zoom-row" style={{ height: "36px" }}>
+      <button
+        aria-label="ย่อ PDF"
+        disabled={previewZoom <= 75}
+        onClick={() => setPreviewZoom((current) => Math.max(75, current - 25))}
+        type="button"
+      >-</button>
+      <span style={{ padding: "0 6px", fontSize: "12px" }}>{previewZoom}%</span>
+      <button
+        aria-label="ขยาย PDF"
+        disabled={previewZoom >= 200}
+        onClick={() => setPreviewZoom((current) => Math.min(200, current + 25))}
+        type="button"
+      >+</button>
+    </div>
 
-            <button
-              className="primary-action small-action"
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-            >
-              {isGeneratingPdf ? (
-                <>
-                  <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
-                  กำลังสร้าง...
-                </>
-              ) : (
-                <>
-                  <FileText size={16} aria-hidden="true" />สร้าง PDF
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+    <button
+      className="secondary-action small-action"
+      type="button"
+      onClick={() => setIsPreviewFullScreen((current) => !current)}
+    >
+      <Expand size={16} aria-hidden="true" />
+      <span>{isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}</span>
+    </button>
+
+    <button
+      className="primary-action small-action"
+      type="button"
+      onClick={handleDownloadPdf}
+      disabled={isGeneratingPdf}
+    >
+      {isGeneratingPdf ? (
+        <>
+          <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
+          <span>กำลังสร้าง...</span>
+        </>
+      ) : (
+        <>
+          <FileText size={16} aria-hidden="true" />
+          <span>สร้าง PDF</span>
+        </>
+      )}
+    </button>
+  </div>
+</div>
         <div className="preview-body">
           <div className="pdf-page pdf-template-page">
             <div className="pdf-template-canvas" data-existing-year-edit={coverYearText}>

@@ -39,7 +39,7 @@ export const reportTemplates: ReportTemplateDefinition[] = [
   {
     id: "sign-inspection-report",
     code: "TMP-SIGN-INSPECTION-2568",
-    name: "รายงานตรวจสอบป้าย บริษัท เฌอร่า จำกัด (มหาชัย)",
+    name: "รายงานตรวจสอบป้าย",
     description: "รายงานผลการตรวจสอบป้ายประจำปี พร้อมรายละเอียดการตรวจและภาพประกอบ จำนวน 15 หน้า",
     pages: 15,
     pdfUrl: "/templates/sign-inspection-report.pdf?v=20260826-9",

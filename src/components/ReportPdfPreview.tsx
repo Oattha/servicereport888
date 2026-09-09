@@ -25,6 +25,42 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // เพิ่ม State และ Ref สำหรับระบบคลิกลากเลื่อนกระดาษ (Pan)
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [startY, setStartY] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    setStartX(e.pageX - containerRef.current.offsetLeft);
+    setStartY(e.pageY - containerRef.current.offsetTop);
+    setScrollLeft(containerRef.current.scrollLeft);
+    setScrollTop(containerRef.current.scrollTop);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - containerRef.current.offsetLeft;
+    const y = e.pageY - containerRef.current.offsetTop;
+    const walkX = (x - startX) * 1.5;
+    const walkY = (y - startY) * 1.5;
+    containerRef.current.scrollLeft = scrollLeft - walkX;
+    containerRef.current.scrollTop = scrollTop - walkY;
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = canvas?.parentElement?.parentElement;
@@ -152,17 +188,25 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
       {isLoading ? <div className="pdf-preview-loading">กำลังสร้างตัวอย่าง PDF</div> : null}
       {errorMessage ? <div className="pdf-preview-loading">Preview error: {errorMessage}</div> : null}
       <div
+        ref={containerRef}
         className="pdf-preview-canvas-stack"
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
         style={{
           height: `${zoom}%`,
-          maxHeight: zoom === 100 ? "100%" : "none"
+          maxHeight: zoom === 100 ? "100%" : "none",
+          cursor: isDragging ? "grabbing" : "grab",
+          overflow: "auto",
+          userSelect: "none"
         }}
       >
         <canvas
           aria-label={`PDF template page ${page}`}
           className={isLoading ? "pdf-template-frame loading" : "pdf-template-frame"}
           ref={canvasRef}
-          style={{ height: "100%", width: "100%" }}
+          style={{ height: "100%", width: "100%", pointerEvents: isDragging ? "none" : "auto" }}
         />
       </div>
     </>

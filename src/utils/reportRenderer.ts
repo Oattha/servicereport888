@@ -3537,10 +3537,15 @@ async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportR
     const options = row.kind === "frequency"
       ? signMaintenanceFrequencyOptions
       : signMaintenanceResultOptions;
-    const bounds = signMaintenanceChoiceColumns[row.kind];
+    const bounds: Readonly<Record<string, readonly [number, number]>> =
+      row.kind === "frequency"
+        ? signMaintenanceChoiceColumns.frequency
+        : signMaintenanceChoiceColumns.result;
 
     for (const option of options) {
-      const [left, right] = bounds[option.key as keyof typeof bounds];
+      const optionBounds = bounds[option.key];
+      if (!optionBounds) continue;
+      const [left, right] = optionBounds;
       const centerX = (left + right) / 2;
       page.drawRectangle({
         x: centerX - 7,
@@ -3562,8 +3567,9 @@ async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportR
 
     const selectedChoice = state.signMaintenanceForm?.choices?.[row.key] ?? null;
     if (selectedChoice) {
-      const [left, right] = bounds[selectedChoice as keyof typeof bounds];
-      if (left !== undefined && right !== undefined) {
+      const selectedBounds = bounds[selectedChoice];
+      if (selectedBounds) {
+        const [left, right] = selectedBounds;
         drawPage23CheckMark(page, (left + right) / 2, centerY);
       }
     }

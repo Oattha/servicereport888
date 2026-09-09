@@ -552,6 +552,40 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     });
   }, []);
 
+  // สลับค่า Viewport อัตโนมัติเมื่อเข้า/ออกโหมดเต็มจอ (Fullscreen)
+  useEffect(() => {
+    let viewportMeta = document.querySelector("meta[name='viewport']");
+    if (!viewportMeta) {
+      viewportMeta = document.createElement("meta");
+      viewportMeta.setAttribute("name", "viewport");
+      document.head.appendChild(viewportMeta);
+    }
+
+    if (isPreviewFullScreen) {
+      // เปิดให้มือถือ/ไอแพดถ่างซูมได้เฉพาะตอนอยู่หน้าเต็มจอ
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
+      );
+    } else {
+      // ล็อกห้ามซูมหน้าจอเมื่อกลับมาหน้าปกติ
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      );
+    }
+
+    return () => {
+      // คืนค่ากลับเป็นแบบล็อกเมื่อออกจากหน้ารายงาน
+      if (viewportMeta) {
+        viewportMeta.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+        );
+      }
+    };
+  }, [isPreviewFullScreen]);
+
   useEffect(() => {
     const query = fieldValues.owner_company?.trim() ?? "";
     if (!query || selectedCompanyId) {

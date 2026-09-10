@@ -103,7 +103,8 @@ import {
 import {
   defaultSignInspectionPage12State,
   signInspectionPage12Groups,
-  signInspectionPage12Rows
+  signInspectionPage12Rows,
+  type SignInspectionPage12State
 } from "../data/signInspectionPage12";
 import {
   defaultSignInspectionPage9State,
@@ -2248,10 +2249,10 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                     <label className="field">
                       <span>ชื่อผู้ตรวจสอบ</span>
                       <input
-                        maxLength={80}
-                        placeholder="ใช้ชื่อเดิมจาก Template"
-                        value={page25Signatures.inspectorName}
-                        onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
+                        readOnly
+                        disabled
+                        style={{ backgroundColor: "#f1f5f9", cursor: "not-allowed", color: "#475569" }}
+                        value="นายสนทยา คำภีร์ทอง"
                       />
                     </label>
                     <label className="field">
@@ -2735,6 +2736,82 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
             ) : null}
           </section>
         ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && currentTemplatePage === 7 ? (
+          <section className="builder-card">
+            <div className="image-upload-header">
+              <div>
+                <span className="page-kicker">หน้า 7 / 35</span>
+                <h2>ข้อมูลทั่วไปและสแกนข้อมูลสำหรับหน้า 7</h2>
+                <p>สแกนข้อมูลหรือกรอกข้อมูลด้านล่างเพื่ออัปแสดงผลบนหน้า 7 ทันที</p>
+              </div>
+            </div>
+            <BusinessCardScanner onConfirm={handleBusinessCardConfirm} />
+            <div className="form-grid" style={{ marginTop: "16px" }}>
+              <label className="field full">
+                <span>ชื่อสถานประกอบการ / บริษัท</span>
+                <input
+                  value={getFieldValue("owner_company")}
+                  onChange={(e) => updateFieldValue("owner_company", e.target.value)}
+                  placeholder="ชื่อบริษัท"
+                />
+              </label>
+              <label className="field full">
+                <span>ที่อยู่สถานที่ตั้ง</span>
+                <textarea
+                  rows={3}
+                  value={getFieldValue("building_address")}
+                  onChange={(e) => updateFieldValue("building_address", e.target.value)}
+                  placeholder="ที่อยู่"
+                />
+              </label>
+            </div>
+          </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
+          && currentTemplatePage === 15 ? (
+          <section className="builder-card">
+            <div className="image-upload-header">
+              <div>
+                <span className="page-kicker">หน้า 15 / 35</span>
+                <h2>สรุปผลรวมอุปกรณ์และรูปภาพประกอบ</h2>
+                <p>อัปโหลดรูปภาพประกอบจำนวน 2 รูปสำหรับแสดงผลในหน้า 15</p>
+              </div>
+            </div>
+            <div className="upload-grid" style={{ marginTop: "16px" }}>
+              <ImageSlot
+                edit={imageEdits["mixing_page15_photo_1"]}
+                onReplace={handleReplaceImage}
+                slot={{
+                  key: "mixing_page15_photo_1",
+                  label: "รูปภาพประกอบที่ 1",
+                  page: 15,
+                  type: "image",
+                  x: 54,
+                  y: 350,
+                  width: 200,
+                  height: 150,
+                  recommendedSize: "JPG หรือ PNG",
+                  locked: true
+                }}
+              />
+              <ImageSlot
+                edit={imageEdits["mixing_page15_photo_2"]}
+                onReplace={handleReplaceImage}
+                slot={{
+                  key: "mixing_page15_photo_2",
+                  label: "รูปภาพประกอบที่ 2",
+                  page: 15,
+                  type: "image",
+                  x: 286,
+                  y: 350,
+                  width: 200,
+                  height: 150,
+                  recommendedSize: "JPG หรือ PNG",
+                  locked: true
+                }}
+              />
+            </div>
+          </section>
+        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
           && currentTemplatePage === 14 ? (
           <section className="builder-card template-readonly-card">
             <FileText size={24} aria-hidden="true" />
@@ -2742,16 +2819,6 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               <span className="page-kicker">หน้า 14 / 35</span>
               <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
               <p>หน้านี้ใช้ช่วงเวลาและความถี่ในการตรวจสอบตาม Template เดิม และไม่เปิดให้แก้ไขข้อมูล</p>
-            </div>
-          </section>
-        ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
-          && currentTemplatePage === 15 ? (
-          <section className="builder-card template-readonly-card">
-            <FileText size={24} aria-hidden="true" />
-            <div>
-              <span className="page-kicker">หน้า 15 / 35</span>
-              <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
-              <p>หน้านี้ใช้ช่วงเวลาและความถี่ในการตรวจสอบตาม Template เดิม และลบวันที่ด้านล่างออกแล้ว</p>
             </div>
           </section>
         ) : selectedTemplateId === "mixing-workshop-maintenance-plan"

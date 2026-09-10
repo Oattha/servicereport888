@@ -1868,12 +1868,9 @@ async function createPage25TextOverlayBytes(state: ReportRenderState) {
   context.textRendering = "geometricPrecision";
   context.font = `${15.96 * scale}px "Page25CordiaNew"`;
 
-  const inspectorName = state.page25Signatures.inspectorName.trim();
   const inspectorNote = state.page25Signatures.inspectorNote.trim();
-  if (inspectorName || inspectorNote) {
-    const value = [inspectorName || "นายสายชล สิงหนารถ", inspectorNote].filter(Boolean).join(" ");
-    context.fillText(createPage25ParentheticalLine(context, value, 211, scale), 106 * scale, 390 * scale);
-  }
+  const value = ["นายสนทยา คำภีร์ทอง", inspectorNote].filter(Boolean).join(" ");
+  context.fillText(createPage25ParentheticalLine(context, value, 211, scale), 106 * scale, 390 * scale);
 
   const thaiDate = formatPage25ThaiDate(state.page25Signatures.inspectionDate);
   if (thaiDate) {
@@ -2109,7 +2106,7 @@ async function createAnnualAssessmentPageBytes(state: ReportRenderState) {
   const certificationText = "ข้าพเจ้าในฐานะผู้ตรวจสอบอาคารขอรับรองว่าได้ทำการตรวจสอบสภาพอาคารดังกล่าว โดยผลการตรวจสอบอาคารและอุปกรณ์ประกอบอาคารถูกต้องและเป็นจริงตามที่ระบุไว้ในรายงานฉบับนี้ รวมทั้งได้แจ้งผลการตรวจสอบให้เจ้าของอาคาร ผู้ครอบครอง หรือผู้ดูแลอาคารได้รับทราบแล้ว";
   cursorY = drawAnnualAssessmentWrappedText(context, certificationText, 38, cursorY + 9, 464, 17);
 
-  const inspectorName = state.page25Signatures.inspectorName.trim() || "นายสนทยา คำภีร์ทอง";
+  const inspectorName = "นายสนทยา คำภีร์ทอง";
   const thaiDate = formatPage25ThaiDate(state.page25Signatures.inspectionDate);
   context.font = '11px "AnnualAssessmentTahoma", Tahoma, sans-serif';
   context.fillText("ลงชื่อ ..................................................................... ผู้ตรวจสอบอาคาร", 86, cursorY + 23);
@@ -2260,7 +2257,16 @@ async function replacePage25Signatures(pdf: PDFDocument, state: ReportRenderStat
     state.page25Signatures.ownerPosition.trim()
   );
 
-  if (hasInspectorText) page.drawRectangle({ x: 104, y: 386, width: 214, height: 19, color: rgb(1, 1, 1) });
+  if (hasInspectorText) {
+    // ขยายกล่องสีขาวให้สูงขึ้นเป็น 26 และเริ่มจาก y: 382 เพื่อลบเศษสระและจุดดำด้านบนให้เกลี้ยง
+    page.drawRectangle({ 
+      x: 100, 
+      y: 382, 
+      width: 225, 
+      height: 26, 
+      color: rgb(1, 1, 1) 
+    });
+  }
   if (hasDate) page.drawRectangle({ x: 101, y: 345, width: 230, height: 25, color: rgb(1, 1, 1) });
   if (hasOwnerText) page.drawRectangle({ x: 104, y: 77, width: 200, height: 20, color: rgb(1, 1, 1) });
 
@@ -3537,10 +3543,15 @@ async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportR
     const options = row.kind === "frequency"
       ? signMaintenanceFrequencyOptions
       : signMaintenanceResultOptions;
-    const bounds = signMaintenanceChoiceColumns[row.kind];
+    const bounds: Readonly<Record<string, readonly [number, number]>> =
+      row.kind === "frequency"
+        ? signMaintenanceChoiceColumns.frequency
+        : signMaintenanceChoiceColumns.result;
 
     for (const option of options) {
-      const [left, right] = bounds[option.key as keyof typeof bounds];
+      const optionBounds = bounds[option.key];
+      if (!optionBounds) continue;
+      const [left, right] = optionBounds;
       const centerX = (left + right) / 2;
       page.drawRectangle({
         x: centerX - 7,
@@ -3562,8 +3573,9 @@ async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportR
 
     const selectedChoice = state.signMaintenanceForm?.choices?.[row.key] ?? null;
     if (selectedChoice) {
-      const [left, right] = bounds[selectedChoice as keyof typeof bounds];
-      if (left !== undefined && right !== undefined) {
+      const selectedBounds = bounds[selectedChoice];
+      if (selectedBounds) {
+        const [left, right] = selectedBounds;
         drawPage23CheckMark(page, (left + right) / 2, centerY);
       }
     }

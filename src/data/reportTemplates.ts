@@ -28,8 +28,8 @@ export const reportTemplates: ReportTemplateDefinition[] = [
   {
     id: "maintenance-plan",
     code: "TMP-MAINTENANCE-PLAN",
-    name: "แผนปฏิบัติการการตรวจบำรุงรักษาอาคาร",
-    description: "แผนปฏิบัติการการตรวจบำรุงรักษาอาคารและอุปกรณ์ประกอบของอาคาร จำนวน 19 หน้า",
+    name: "แผนปฏิบัติการการตรวจบำรุงรักษาอาคาร (ประจำปี)",
+    description: "แผนปฏิบัติการการตรวจบำรุงรักษาอาคารและอุปกรณ์ประกอบของอาคาร (ประจำปี) จำนวน 19 หน้า",
     pages: 19,
     pdfUrl: "/templates/building-maintenance-plan.pdf",
     downloadFileName: "building-maintenance-plan.pdf",
@@ -51,7 +51,7 @@ export const reportTemplates: ReportTemplateDefinition[] = [
   {
     id: "sign-maintenance-plan",
     code: "TMP-SIGN-MAINTENANCE-PLAN",
-    name: "แผนปฏิบัติการการตรวจบำรุงรักษาป้าย",
+    name: "แผนปฏิบัติการการตรวจบํารุงรักษาป้าย",
     description: "แผนปฏิบัติการตรวจบำรุงรักษาป้ายและอุปกรณ์ประกอบ จำนวน 7 หน้า",
     pages: 7,
     pdfUrl: "/templates/sign-maintenance-plan.pdf?v=20260826-1",
@@ -63,8 +63,8 @@ export const reportTemplates: ReportTemplateDefinition[] = [
   {
     id: "mixing-workshop-maintenance-plan",
     code: "TMP-MIXING-WORKSHOP-2568",
-    name: "แผนปฏิบัติการอาคาร Mixing Work Shop ปี 68",
-    description: "แผนปฏิบัติการตรวจบำรุงรักษาอาคารและอุปกรณ์ประกอบของอาคาร Mixing Work Shop จำนวน 35 หน้า",
+    name: "แผนปฏิบัติการการตรวจบำรุงรักษาอาคาร (ตรวจสอบใหญ่)",
+    description: "แผนปฏิบัติการตรวจบำรุงรักษาอาคารและอุปกรณ์ประกอบของอาคาร (ตรวจสอบใหญ่) จำนวน 35 หน้า",
     pages: 35,
     pdfUrl: "/templates/mixing-workshop-maintenance-plan.pdf?v=20260826-2",
     downloadFileName: "mixing-workshop-maintenance-plan-2568.pdf",

@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS reports (
   building_id UUID REFERENCES buildings(id) ON DELETE SET NULL,
   template_id UUID REFERENCES report_templates(id) ON DELETE SET NULL,
   inspector_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  status VARCHAR(30) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'ready', 'sent')),
+  status VARCHAR(30) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'in_review', 'ready', 'sent', 'signed')),
   progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
   inspection_date DATE,
   recipient_email VARCHAR(180),
@@ -71,6 +71,14 @@ CREATE TABLE IF NOT EXISTS reports (
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(180);
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
 ALTER TABLE reports ADD COLUMN IF NOT EXISTS data JSONB;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS sign_token VARCHAR(64);
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS signed_pdf_url TEXT;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS customer_remarks TEXT;
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS signed_at TIMESTAMPTZ;
+ALTER TABLE reports DROP CONSTRAINT IF EXISTS reports_status_check;
+ALTER TABLE reports
+  ADD CONSTRAINT reports_status_check
+  CHECK (status IN ('draft', 'in_review', 'ready', 'sent', 'signed'));
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS normalized_name VARCHAR(240);
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -78,6 +86,9 @@ CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 CREATE INDEX IF NOT EXISTS idx_reports_customer_id ON reports(customer_id);
 CREATE INDEX IF NOT EXISTS idx_reports_building_id ON reports(building_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_sign_token_unique
+  ON reports(sign_token)
+  WHERE sign_token IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_normalized_name_unique
   ON customers(normalized_name)
   WHERE normalized_name IS NOT NULL AND normalized_name <> '';

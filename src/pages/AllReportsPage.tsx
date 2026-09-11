@@ -8,6 +8,7 @@ import {
   Send,
   X,
   Eye
+  
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PageHeader } from "../components/PageHeader";
@@ -57,6 +58,8 @@ import { defaultPage23Remarks, defaultPage23Results } from "../data/page23Fields
 import { defaultPage24Remarks, defaultPage24Results } from "../data/page24Fields";
 import { defaultPage25Signatures } from "../data/page25Fields";
 import type { SharedReport, ReportRenderState } from "../types";
+import { defaultSignInspectionPage7State } from "../data/signInspectionPage7";
+import { defaultSignInspectionPage8State } from "../data/signInspectionPage8";
 
 function formatUpdatedAt(value?: string | null) {
   if (!value) return "-";
@@ -140,7 +143,7 @@ export function AllReportsPage() {
     }
   }
 
-  //  ฟังก์ชันดึง RenderState จากรายงานจริง หรือใช้ Fallback
+  // ฟังก์ชันดึง RenderState จากรายงานจริง หรือใช้ Fallback
   function getReportRenderState(report: SharedReport & { data?: ReportRenderState }): ReportRenderState {
     if (report.data) {
       return report.data;
@@ -148,6 +151,38 @@ export function AllReportsPage() {
 
     return {
       templateId: "annual-inspection",
+      annualAssessmentResult: null,
+      signInspectionPage15Choices: {},
+      signInspectionPage13State: {},
+      signInspectionPage12State: {},
+      signInspectionPage9State: {},
+      signInspectionPage7State: structuredClone(defaultSignInspectionPage7State),
+      signInspectionPage8State: structuredClone(defaultSignInspectionPage8State),
+      signInspectionPage4State: {
+        signName: "",
+        address: "",
+        phone: "",
+        fax: "",
+        permitAuthority: "",
+        permitDay: "",
+        permitMonth: "",
+        permitYear: "",
+        planChoice: null,
+        permitChoice: null,
+        signAgeMonths: "",
+        mapLocation: {
+          latitude: "",
+          longitude: "",
+          googleMapsUrl: "",
+          mapScreenshotUrl: "",
+          uploadedImageUrl: "",
+          uploadedImageName: "",
+          mapImageSource: "",
+          satellite: false,
+          placeName: "",
+          address: ""
+        }
+      },
       maintenancePlanPage7Checks: defaultMaintenancePlanPage7Checks,
       maintenancePlanPage8Checks: defaultMaintenancePlanPage8Checks,
       maintenancePlanPages9To16Checks: defaultMaintenancePlanPages9To16Checks,
@@ -214,6 +249,33 @@ export function AllReportsPage() {
         address: ""
       }
     };
+  }
+
+  async function handleViewSignedPdf() {
+    const signedUrl = (selectedReport as any)?.signedPdfUrl;
+    if (!signedUrl) return;
+
+    const previewWindow = window.open("", "_blank");
+    if (previewWindow) {
+      previewWindow.document.write("<h3 style='font-family: sans-serif; padding: 2rem;'>กำลังโหลดเอกสารที่เซ็นแล้ว...</h3>");
+    }
+
+    try {
+      // ดึงไฟล์จาก Cloudinary มาแปลงประเภทให้ถูกต้อง
+      const response = await fetch(signedUrl);
+      const blobData = await response.blob();
+      const pdfBlob = new Blob([blobData], { type: "application/pdf" });
+      const url = URL.createObjectURL(pdfBlob);
+
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, "_blank");
+      }
+    } catch (err) {
+      if (previewWindow) previewWindow.close();
+      alert("ไม่สามารถเปิดเอกสารได้ กรุณาลองใหม่อีกครั้ง");
+    }
   }
 
   async function handlePreviewPdf() {
@@ -374,8 +436,25 @@ export function AllReportsPage() {
                     <td>{report.customer}</td>
                     <td>{report.template}</td>
                     <td>{report.inspector}</td>
-                    <td>
-                      {report.status === "sent" ? (
+                      <td>
+                      {report.status === "signed" || (report as any).signedPdfUrl ? (
+                        <span
+                          style={{
+                            backgroundColor: "#e0e7ff",
+                            color: "#3730a3",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                            padding: "0.2rem 0.6rem",
+                            borderRadius: "1rem",
+                            fontSize: "0.8rem",
+                            fontWeight: 500
+                          }}
+                        >
+                          <CheckCircle2 size={13} />
+                          เซ็นรับรองแล้ว
+                        </span>
+                      ) : report.status === "sent" ? (
                         <span
                           style={{
                             backgroundColor: "#d1fae5",
@@ -411,6 +490,7 @@ export function AllReportsPage() {
                         </span>
                       )}
                     </td>
+
                     <td>{formatUpdatedAt(report.updatedAt)}</td>
                     <td style={{ textAlign: "right" }}>
                       <div
@@ -518,6 +598,7 @@ export function AllReportsPage() {
               </div>
             ) : (
               <div style={{ display: "grid", gap: "1rem", marginTop: "1rem" }}>
+                {/* 1. กล่องข้อมูลอาคาร/ลูกค้า + ปุ่มดูตัวอย่าง PDF ฉบับร่าง (ก่อนส่ง) */}
                 <div
                   style={{
                     backgroundColor: "#f9fafb",
@@ -539,7 +620,6 @@ export function AllReportsPage() {
                     </span>
                   </div>
 
-                  {/*  ปุ่มกดเปิดดูตัวอย่าง PDF */}
                   <button
                     className="secondary-action small-action"
                     type="button"
@@ -548,8 +628,70 @@ export function AllReportsPage() {
                     style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", borderColor: "#3b82f6", color: "#2563eb" }}
                   >
                     <Eye size={16} />
-                    {isGeneratingPreview ? "กำลังโหลด..." : "ดูตัวอย่าง PDF"}
+                    {isGeneratingPreview ? "กำลังโหลด..." : "ดูต้นฉบับร่าง (ก่อนส่ง)"}
                   </button>
+                </div>
+
+                {/* 2. กล่องแสดงสถานะการเซ็นเอกสาร + ปุ่มเปิดดูไฟล์ที่ลูกค้าอัปโหลดมา (ฉบับส่งคืน) */}
+                <div
+                  style={{
+                    padding: "0.875rem",
+                    borderRadius: "0.5rem",
+                    border: "1px solid #e2e8f0",
+                    backgroundColor: (selectedReport as any).signedPdfUrl ? "#f0fdf4" : "#f8fafc",
+                    display: "grid",
+                    gap: "0.5rem"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <span style={{ fontSize: "0.8rem", color: "#64748b", display: "block" }}>สถานะการรับรองเอกสาร</span>
+                      <strong style={{ fontSize: "0.95rem", color: (selectedReport as any).signedPdfUrl ? "#166534" : "#475569" }}>
+                        {(selectedReport as any).signedPdfUrl ? "✓ ลูกค้าเซ็นรับรองและส่งคืนแล้ว" : "รอการเซ็นรับรองจากลูกค้า"}
+                      </strong>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      {(selectedReport as any).signedPdfUrl ? (
+                        <button
+                          type="button"
+                          className="primary-action small-action"
+                          onClick={() => void handleViewSignedPdf()}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", backgroundColor: "#16a34a", border: "none", cursor: "pointer" }}
+                        >
+                          <FileText size={15} />
+                          ดูไฟล์ที่เซ็นแล้ว (ฉบับส่งคืน)
+                        </button>
+                      ) : null}
+
+                      {(selectedReport as any).signToken ? (
+                        <button
+                          type="button"
+                          className="secondary-action small-action"
+                          style={{ fontSize: "0.775rem" }}
+                          onClick={() => {
+                            const link = `https://servicereport.pages.dev/sign-portal?token=${(selectedReport as any).signToken}`;
+                            navigator.clipboard.writeText(link);
+                            alert("คัดลอกลิงก์ Portal สำหรับส่งให้ลูกค้าเรียบร้อยแล้ว");
+                          }}
+                        >
+                          คัดลอกลิงก์ Portal
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {/* แสดงข้อความที่ลูกค้าพิมพ์ส่งกลับมา (ถ้ามี) */}
+                  {(selectedReport as any).customerRemarks ? (
+                    <div style={{ marginTop: "0.35rem", padding: "0.6rem 0.75rem", backgroundColor: "#ffffff", border: "1px dashed #86efac", borderRadius: "6px", fontSize: "0.85rem" }}>
+                      <span style={{ fontWeight: 600, color: "#166534", display: "block", marginBottom: "0.2rem" }}>
+                        ข้อความจากลูกค้า:
+                      </span>
+                      <span style={{ color: "#334155", whiteSpace: "pre-wrap" }}>
+                        {(selectedReport as any).customerRemarks}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
 
                 {sendSuccess ? (

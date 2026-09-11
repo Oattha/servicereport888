@@ -1,7 +1,7 @@
 import type { Page25SignatureState, TemplateImageSlot } from "../types";
 
 export const defaultPage25Signatures: Page25SignatureState = {
-  inspectorName: "",
+  inspectorName: "นายสนทยา คำภีร์ทอง",
   inspectorNote: "",
   inspectionDate: "",
   ownerName: "",

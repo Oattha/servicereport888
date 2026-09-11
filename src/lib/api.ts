@@ -102,6 +102,9 @@ export type SendReportEmailInput = {
   ccEmail?: string;
   fileName: string;
   pdfBase64: string;
+  subject?: string;
+  messageBody?: string;
+  signOff?: string;
 };
 
 export function sendReportEmail(reportId: string, input: SendReportEmailInput) {

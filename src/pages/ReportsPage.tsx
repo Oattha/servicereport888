@@ -103,7 +103,8 @@ import {
 import {
   defaultSignInspectionPage12State,
   signInspectionPage12Groups,
-  signInspectionPage12Rows
+  signInspectionPage12Rows,
+  type SignInspectionPage12State
 } from "../data/signInspectionPage12";
 import {
   defaultSignInspectionPage9State,
@@ -289,6 +290,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
 
   const [recipientEmail, setRecipientEmail] = useState(initialState?.fieldValues.customer_email ?? "");
   const [ccEmail, setCcEmail] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [emailSignOff, setEmailSignOff] = useState("ขอแสดงความนับถือ,\nทีมงาน TEST TRUE");
   const [emailSendStatus, setEmailSendStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [emailError, setEmailError] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<ReportTemplateId>(
@@ -299,7 +303,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [imageRevision, setImageRevision] = useState(0);
   const [isPreviewFullScreen, setIsPreviewFullScreen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
-  
+
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({
     ...defaultTemplateFieldValues,
     ...defaultSignInspectionCoverFields,
@@ -310,7 +314,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       initialState?.fieldValues?.[signInspectionCoverFieldKeys.yearSuffix] === "68"
         ? "69"
         : initialState?.fieldValues?.[signInspectionCoverFieldKeys.yearSuffix]
-          ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.yearSuffix]
+        ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.yearSuffix]
   });
 
   const [mapLocation, setMapLocation] = useState<MapLocationValue>({
@@ -533,7 +537,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   const [annualAssessmentResult, setAnnualAssessmentResult] = useState<AnnualAssessmentResult>(
     initialState?.annualAssessmentResult ?? null
   );
-  
+
   const [page25Signatures, setPage25Signatures] = useState({
     ...defaultPage25Signatures,
     inspectionDate: initialState?.page25Signatures?.inspectionDate || getCurrentDateString(),
@@ -548,6 +552,40 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       if (edit.objectUrl.startsWith("blob:")) URL.revokeObjectURL(edit.objectUrl);
     });
   }, []);
+
+  // สลับค่า Viewport อัตโนมัติเมื่อเข้า/ออกโหมดเต็มจอ (Fullscreen)
+  useEffect(() => {
+    let viewportMeta = document.querySelector("meta[name='viewport']");
+    if (!viewportMeta) {
+      viewportMeta = document.createElement("meta");
+      viewportMeta.setAttribute("name", "viewport");
+      document.head.appendChild(viewportMeta);
+    }
+
+    if (isPreviewFullScreen) {
+      // เปิดให้มือถือ/ไอแพดถ่างซูมได้เฉพาะตอนอยู่หน้าเต็มจอ
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover"
+      );
+    } else {
+      // ล็อกห้ามซูมหน้าจอเมื่อกลับมาหน้าปกติ
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      );
+    }
+
+    return () => {
+      // คืนค่ากลับเป็นแบบล็อกเมื่อออกจากหน้ารายงาน
+      if (viewportMeta) {
+        viewportMeta.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+        );
+      }
+    };
+  }, [isPreviewFullScreen]);
 
   useEffect(() => {
     const query = fieldValues.owner_company?.trim() ?? "";
@@ -658,29 +696,29 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     ? currentMixingWorkshopExtendedDefinition.groups
     : currentTemplatePage === 23
       ? mixingWorkshopPage23Groups
-    : currentTemplatePage === 26
-    ? mixingWorkshopPage26Groups
-    : currentTemplatePage === 25
-      ? mixingWorkshopPage25Groups
-      : mixingWorkshopPage24Groups;
+      : currentTemplatePage === 26
+        ? mixingWorkshopPage26Groups
+        : currentTemplatePage === 25
+          ? mixingWorkshopPage25Groups
+          : mixingWorkshopPage24Groups;
   const currentMixingWorkshopDetailedChecks = currentMixingWorkshopExtendedDefinition
     ? mixingWorkshopPages27To32Checks[currentMixingWorkshopExtendedDefinition.page]
     : currentTemplatePage === 23
       ? mixingWorkshopPage23Checks
-    : currentTemplatePage === 26
-    ? mixingWorkshopPage26Checks
-    : currentTemplatePage === 25
-      ? mixingWorkshopPage25Checks
-      : mixingWorkshopPage24Checks;
+      : currentTemplatePage === 26
+        ? mixingWorkshopPage26Checks
+        : currentTemplatePage === 25
+          ? mixingWorkshopPage25Checks
+          : mixingWorkshopPage24Checks;
   const currentMixingWorkshopDetailedRemarks = currentMixingWorkshopExtendedDefinition
     ? mixingWorkshopPages27To32Remarks[currentMixingWorkshopExtendedDefinition.page]
     : currentTemplatePage === 23
       ? mixingWorkshopPage23Remarks
-    : currentTemplatePage === 26
-    ? mixingWorkshopPage26Remarks
-    : currentTemplatePage === 25
-      ? mixingWorkshopPage25Remarks
-      : mixingWorkshopPage24Remarks;
+      : currentTemplatePage === 26
+        ? mixingWorkshopPage26Remarks
+        : currentTemplatePage === 25
+          ? mixingWorkshopPage25Remarks
+          : mixingWorkshopPage24Remarks;
   const currentMixingWorkshopSummaryDefinition = getMixingWorkshopSummaryDefinition(currentTemplatePage);
   const currentMixingWorkshopSummaryChoices = currentMixingWorkshopSummaryDefinition
     ? mixingWorkshopPages34To35Choices[currentMixingWorkshopSummaryDefinition.page]
@@ -1478,6 +1516,13 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       });
       setCompletedReportId(savedReport.id);
       setRecipientEmail(getFieldValue("customer_email"));
+
+      const building = getFieldValue("building_name") || "อาคาร";
+      const customer = getFieldValue("owner_company") || "ลูกค้า";
+      setEmailSubject(`รายงานการตรวจสอบอาคาร - ${building}`);
+      setEmailBody(`เรียน ${customer},\n\nทางเราได้ดำเนินการตรวจสอบอาคารเรียบร้อยแล้ว รายละเอียดและผลการตรวจสอบปรากฏตามเอกสาร PDF ที่แนบมาพร้อมอีเมลฉบับนี้ครับ`);
+      setEmailSignOff("ขอแสดงความนับถือ,\nทีมงาน TEST TRUE");
+
       setEmailSendStatus("idle");
       setEmailError("");
       setIsEmailDialogOpen(true);
@@ -1523,7 +1568,10 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         recipientEmail: normalizedEmail,
         ccEmail: normalizedCc || undefined,
         fileName: pdfFileName,
-        pdfBase64
+        pdfBase64,
+        subject: emailSubject,
+        messageBody: emailBody,
+        signOff: emailSignOff
       });
       setEmailSendStatus("success");
       window.setTimeout(() => {
@@ -1760,11 +1808,11 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                           <dd>
                             {companyHistory.company.emails.length > 0
                               ? companyHistory.company.emails.map((email) => (
-                                  <span className="historical-value-action" key={email}>
-                                    {email}
-                                    <button type="button" onClick={() => updateFieldValue("customer_email", email)}>ใช้ค่านี้</button>
-                                  </span>
-                                ))
+                                <span className="historical-value-action" key={email}>
+                                  {email}
+                                  <button type="button" onClick={() => updateFieldValue("customer_email", email)}>ใช้ค่านี้</button>
+                                </span>
+                              ))
                               : "ไม่มีข้อมูล"}
                           </dd>
                         </div>
@@ -1842,87 +1890,87 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </section>
             ) : null}
 
-{currentTemplatePage === 14 ? (
-  <section className="builder-card general-building-card">
-    <span className="page-kicker">หน้า 14</span>
-    <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
-    <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
-    <div className="form-grid">
+            {currentTemplatePage === 14 ? (
+              <section className="builder-card general-building-card">
+                <span className="page-kicker">หน้า 14</span>
+                <h2>5.1 ข้อมูลทั่วไปของอาคาร</h2>
+                <p>ชื่อบริษัท ชื่ออาคาร และที่อยู่ ดึงจากข้อมูลที่กรอกในหน้า 1 โดยอัตโนมัติ</p>
+                <div className="form-grid">
 
-      <label className="field">
-        <span>ประเภทเอกสารใบอนุญาตก่อสร้าง</span>
-        <input
-          type="text"
-          placeholder="เช่น อ.1"
-          value={getFieldValue("building_permit_type")}
-          onChange={(event) => updateFieldValue("building_permit_type", event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span>เลขที่ใบอนุญาตก่อสร้าง</span>
-        <input
-          type="text"
-          placeholder="เช่น 100/34"
-          value={getFieldValue("building_permit_number")}
-          onChange={(event) => updateFieldValue("building_permit_number", event.target.value)}
-        />
-      </label>
-      <label className="field full">
-        <span>วันที่ใบอนุญาตก่อสร้าง</span>
-        <input
-          type="date"
-          value={getFieldValue("building_permit_date")}
-          onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
-        />
-      </label>
+                  <label className="field">
+                    <span>ประเภทเอกสารใบอนุญาตก่อสร้าง</span>
+                    <input
+                      type="text"
+                      placeholder="เช่น อ.1"
+                      value={getFieldValue("building_permit_type")}
+                      onChange={(event) => updateFieldValue("building_permit_type", event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>เลขที่ใบอนุญาตก่อสร้าง</span>
+                    <input
+                      type="text"
+                      placeholder="เช่น 100/34"
+                      value={getFieldValue("building_permit_number")}
+                      onChange={(event) => updateFieldValue("building_permit_number", event.target.value)}
+                    />
+                  </label>
+                  <label className="field full">
+                    <span>วันที่ใบอนุญาตก่อสร้าง</span>
+                    <input
+                      type="date"
+                      value={getFieldValue("building_permit_date")}
+                      onChange={(event) => updateFieldValue("building_permit_date", event.target.value)}
+                    />
+                  </label>
 
-      <label className="field">
-        <span>ประเภทเอกสารใบอนุญาตเปิดใช้อาคาร</span>
-        <input
-          type="text"
-          placeholder="เช่น อ.6, ภ.1"
-          value={getFieldValue("controlled_use_permit_type")}
-          onChange={(event) => updateFieldValue("controlled_use_permit_type", event.target.value)}
-        />
-      </label>
-      <label className="field">
-        <span>เลขที่ใบอนุญาตเปิดใช้อาคาร</span>
-        <input
-          type="text"
-          placeholder="เช่น 55/2561"
-          value={getFieldValue("controlled_use_permit_number")}
-          onChange={(event) => updateFieldValue("controlled_use_permit_number", event.target.value)}
-        />
-      </label>
-      <label className="field full">
-        <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
-        <input
-          type="date"
-          value={getFieldValue("controlled_use_permit_date")}
-          onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
-        />
-      </label>
-    </div>
-    
-    <div className="page14-checkbox-groups">
-      {page14CheckboxGroups.map((group) => (
-        <fieldset className="page14-checkbox-group" key={group.key}>
-          <legend>{group.label}</legend>
-          {group.options.map((option) => (
-            <label className="page14-checkbox-option" key={option.key}>
-              <input
-                type="checkbox"
-                checked={page14Checks[option.key]}
-                onChange={() => togglePage14Check(option.key)}
-              />
-              <span>{option.label}</span>
-            </label>
-          ))}
-        </fieldset>
-      ))}
-    </div>
-  </section>
-) : null}
+                  <label className="field">
+                    <span>ประเภทเอกสารใบอนุญาตเปิดใช้อาคาร</span>
+                    <input
+                      type="text"
+                      placeholder="เช่น อ.6, ภ.1"
+                      value={getFieldValue("controlled_use_permit_type")}
+                      onChange={(event) => updateFieldValue("controlled_use_permit_type", event.target.value)}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>เลขที่ใบอนุญาตเปิดใช้อาคาร</span>
+                    <input
+                      type="text"
+                      placeholder="เช่น 55/2561"
+                      value={getFieldValue("controlled_use_permit_number")}
+                      onChange={(event) => updateFieldValue("controlled_use_permit_number", event.target.value)}
+                    />
+                  </label>
+                  <label className="field full">
+                    <span>วันที่ได้รับใบอนุญาตเปิดใช้อาคาร</span>
+                    <input
+                      type="date"
+                      value={getFieldValue("controlled_use_permit_date")}
+                      onChange={(event) => updateFieldValue("controlled_use_permit_date", event.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <div className="page14-checkbox-groups">
+                  {page14CheckboxGroups.map((group) => (
+                    <fieldset className="page14-checkbox-group" key={group.key}>
+                      <legend>{group.label}</legend>
+                      {group.options.map((option) => (
+                        <label className="page14-checkbox-option" key={option.key}>
+                          <input
+                            type="checkbox"
+                            checked={page14Checks[option.key]}
+                            onChange={() => togglePage14Check(option.key)}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             {currentTemplatePage === 15 ? (
               <section className="builder-card">
@@ -2159,124 +2207,124 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
             ) : null}
 
             {selectedTemplateId === "annual-inspection" && currentTemplatePage === 26 ? (
-  <section className="builder-card page25-edit-card">
-    <span className="page-kicker">หน้า 26</span>
-    <h2>ผลประเมินและลายเซ็น</h2>
-    <p>เลือกผลการตรวจสอบเพื่อให้ระบบสร้างหน้าสรุปที่ตรงกับผลประเมิน โดยไม่เปลี่ยนหัวและท้ายกระดาษของ Template</p>
+              <section className="builder-card page25-edit-card">
+                <span className="page-kicker">หน้า 26</span>
+                <h2>ผลประเมินและลายเซ็น</h2>
+                <p>เลือกผลการตรวจสอบเพื่อให้ระบบสร้างหน้าสรุปที่ตรงกับผลประเมิน โดยไม่เปลี่ยนหัวและท้ายกระดาษของ Template</p>
 
-    <fieldset className="annual-assessment-section">
-      <legend>ผลการตรวจสอบอาคาร</legend>
-      <div className="annual-assessment-options">
-        <label className={`annual-assessment-option annual-assessment-pass${annualAssessmentResult === "pass" ? " is-selected" : ""}`}>
-          <input
-            type="radio"
-            name="annual-assessment-result"
-            checked={annualAssessmentResult === "pass"}
-            onChange={() => setAnnualAssessmentResult("pass")}
-          />
-          <span><strong>ผ่าน</strong><small>สร้างหน้าสรุปผลรับรองว่าอาคารผ่านการตรวจสอบ</small></span>
-        </label>
-        <label className={`annual-assessment-option annual-assessment-fail${annualAssessmentResult === "fail" ? " is-selected" : ""}`}>
-          <input
-            type="radio"
-            name="annual-assessment-result"
-            checked={annualAssessmentResult === "fail"}
-            onChange={() => setAnnualAssessmentResult("fail")}
-          />
-          <span><strong>ไม่ผ่าน</strong><small>สร้างหน้าสรุปข้อบกพร่องและกำหนดให้ดำเนินการแก้ไข</small></span>
-        </label>
-      </div>
-      {annualAssessmentResult ? (
-        <p className={`annual-assessment-status ${annualAssessmentResult}`}>
-          หน้าสรุปปัจจุบัน: {annualAssessmentResult === "pass" ? "ผ่านการตรวจสอบ" : "ไม่ผ่านการตรวจสอบ"}
-        </p>
-      ) : (
-        <p className="annual-assessment-status pending">กรุณาเลือก “ผ่าน” หรือ “ไม่ผ่าน”</p>
-      )}
-    </fieldset>
+                <fieldset className="annual-assessment-section">
+                  <legend>ผลการตรวจสอบอาคาร</legend>
+                  <div className="annual-assessment-options">
+                    <label className={`annual-assessment-option annual-assessment-pass${annualAssessmentResult === "pass" ? " is-selected" : ""}`}>
+                      <input
+                        type="radio"
+                        name="annual-assessment-result"
+                        checked={annualAssessmentResult === "pass"}
+                        onChange={() => setAnnualAssessmentResult("pass")}
+                      />
+                      <span><strong>ผ่าน</strong><small>สร้างหน้าสรุปผลรับรองว่าอาคารผ่านการตรวจสอบ</small></span>
+                    </label>
+                    <label className={`annual-assessment-option annual-assessment-fail${annualAssessmentResult === "fail" ? " is-selected" : ""}`}>
+                      <input
+                        type="radio"
+                        name="annual-assessment-result"
+                        checked={annualAssessmentResult === "fail"}
+                        onChange={() => setAnnualAssessmentResult("fail")}
+                      />
+                      <span><strong>ไม่ผ่าน</strong><small>สร้างหน้าสรุปข้อบกพร่องและกำหนดให้ดำเนินการแก้ไข</small></span>
+                    </label>
+                  </div>
+                  {annualAssessmentResult ? (
+                    <p className={`annual-assessment-status ${annualAssessmentResult}`}>
+                      หน้าสรุปปัจจุบัน: {annualAssessmentResult === "pass" ? "ผ่านการตรวจสอบ" : "ไม่ผ่านการตรวจสอบ"}
+                    </p>
+                  ) : (
+                    <p className="annual-assessment-status pending">กรุณาเลือก “ผ่าน” หรือ “ไม่ผ่าน”</p>
+                  )}
+                </fieldset>
 
-    <fieldset className="page25-signature-section">
-      <legend>ผู้ตรวจสอบอาคาร</legend>
-      <div className="form-grid">
-        <label className="field">
-          <span>ชื่อผู้ตรวจสอบ</span>
-          <input
-            maxLength={80}
-            placeholder="ใช้ชื่อเดิมจาก Template"
-            value={page25Signatures.inspectorName}
-            onChange={(event) => updatePage25SignatureField("inspectorName", event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
-          <input
-            maxLength={80}
-            value={page25Signatures.inspectorNote}
-            onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>วันที่ลงนาม</span>
-          <input
-            type="date"
-            value={page25Signatures.inspectionDate}
-            onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
-          />
-        </label>
-      </div>
+                <fieldset className="page25-signature-section">
+                  <legend>ผู้ตรวจสอบอาคาร</legend>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>ชื่อผู้ตรวจสอบ</span>
+                      <input
+                        readOnly
+                        disabled
+                        style={{ backgroundColor: "#f1f5f9", cursor: "not-allowed", color: "#475569" }}
+                        value="นายสนทยา คำภีร์ทอง"
+                      />
+                    </label>
+                    <label className="field">
+                      <span>ข้อมูลเพิ่มเติมในวงเล็บ (ถ้ามี)</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.inspectorNote}
+                        onChange={(event) => updatePage25SignatureField("inspectorNote", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>วันที่ลงนาม</span>
+                      <input
+                        type="date"
+                        value={page25Signatures.inspectionDate}
+                        onChange={(event) => updatePage25SignatureField("inspectionDate", event.target.value)}
+                      />
+                    </label>
+                  </div>
 
-      {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
-      {/* 
+                  {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
+                  {/* 
       <ImageSlot
         edit={imageEdits.page25_inspector_signature}
         onReplace={handleReplaceImage}
         slot={page25SignatureSlots[0]}
       /> 
       */}
-    </fieldset>
+                </fieldset>
 
-    <fieldset className="page25-signature-section">
-      <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
-      <div className="form-grid">
+                <fieldset className="page25-signature-section">
+                  <legend>เจ้าของอาคาร / ผู้จัดการนิติบุคคล</legend>
+                  <div className="form-grid">
 
-        <label className="field">
-          <span>คำนำหน้า</span>
-          <input
-            maxLength={30}
-            placeholder="นาย / นาง / นางสาว / บริษัท"
-            value={page25Signatures.ownerTitle ?? ""}
-            onChange={(event) => updatePage25SignatureField("ownerTitle", event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>ชื่อ-นามสกุล</span>
-          <input
-            maxLength={80}
-            value={page25Signatures.ownerName}
-            onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
-          <input
-            maxLength={80}
-            value={page25Signatures.ownerPosition}
-            onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
-          />
-        </label>
-      </div>
+                    <label className="field">
+                      <span>คำนำหน้า</span>
+                      <input
+                        maxLength={30}
+                        placeholder="นาย / นาง / นางสาว / บริษัท"
+                        value={page25Signatures.ownerTitle ?? ""}
+                        onChange={(event) => updatePage25SignatureField("ownerTitle", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>ชื่อ-นามสกุล</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.ownerName}
+                        onChange={(event) => updatePage25SignatureField("ownerName", event.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>ตำแหน่งหรือข้อมูลในวงเล็บ</span>
+                      <input
+                        maxLength={80}
+                        value={page25Signatures.ownerPosition}
+                        onChange={(event) => updatePage25SignatureField("ownerPosition", event.target.value)}
+                      />
+                    </label>
+                  </div>
 
-      {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
-      {/* 
+                  {/* ปิดส่วนอัปโหลดลายเซ็นอิเล็กทรอนิกส์ชั่วคราว */}
+                  {/* 
       <ImageSlot
         edit={imageEdits.page25_owner_signature}
         onReplace={handleReplaceImage}
         slot={page25SignatureSlots[1]}
       /> 
       */}
-    </fieldset>
-  </section>
-) : null}
+                </fieldset>
+              </section>
+            ) : null}
 
             {currentTemplatePage === 24 ? (
               <section className="builder-card page23-edit-card">
@@ -2705,6 +2753,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               <span className="page-kicker">หน้า 15 / 35</span>
               <h2>ตารางคงที่ตาม PDF ต้นฉบับ</h2>
               <p>หน้านี้ใช้ช่วงเวลาและความถี่ในการตรวจสอบตาม Template เดิม และลบวันที่ด้านล่างออกแล้ว</p>
+
             </div>
           </section>
         ) : selectedTemplateId === "mixing-workshop-maintenance-plan"
@@ -3592,37 +3641,54 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
       </div>
 
       <aside className="preview-panel">
-        <div className="preview-header">
-          <strong>ตัวอย่างรายงาน (Preview)</strong>
-          <div>
-            <button
-              className="secondary-action small-action"
-              type="button"
-              onClick={() => setIsPreviewFullScreen((current) => !current)}
-            >
-              <Expand size={16} aria-hidden="true" />
-              {isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}
-            </button>
+<div className="preview-header">
+  <strong>ตัวอย่างรายงาน (Preview)</strong>
+  <div className="preview-header-actions">
+    <div className="zoom-row" style={{ height: "36px" }}>
+      <button
+        aria-label="ย่อ PDF"
+        disabled={previewZoom <= 75}
+        onClick={() => setPreviewZoom((current) => Math.max(75, current - 25))}
+        type="button"
+      >-</button>
+      <span style={{ padding: "0 6px", fontSize: "12px" }}>{previewZoom}%</span>
+      <button
+        aria-label="ขยาย PDF"
+        disabled={previewZoom >= 200}
+        onClick={() => setPreviewZoom((current) => Math.min(200, current + 25))}
+        type="button"
+      >+</button>
+    </div>
 
-            <button
-              className="primary-action small-action"
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-            >
-              {isGeneratingPdf ? (
-                <>
-                  <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
-                  กำลังสร้าง...
-                </>
-              ) : (
-                <>
-                  <FileText size={16} aria-hidden="true" />สร้าง PDF
-                </>
-              )}
-            </button>
-          </div>
-        </div>
+    <button
+      className="secondary-action small-action"
+      type="button"
+      onClick={() => setIsPreviewFullScreen((current) => !current)}
+    >
+      <Expand size={16} aria-hidden="true" />
+      <span>{isPreviewFullScreen ? "กลับหน้าฟอร์ม" : "ดูเต็มจอ"}</span>
+    </button>
+
+    <button
+      className="primary-action small-action"
+      type="button"
+      onClick={handleDownloadPdf}
+      disabled={isGeneratingPdf}
+    >
+      {isGeneratingPdf ? (
+        <>
+          <Loader2 size={16} className="custom-spinner" aria-hidden="true" />
+          <span>กำลังสร้าง...</span>
+        </>
+      ) : (
+        <>
+          <FileText size={16} aria-hidden="true" />
+          <span>สร้าง PDF</span>
+        </>
+      )}
+    </button>
+  </div>
+</div>
         <div className="preview-body">
           <div className="pdf-page pdf-template-page">
             <div className="pdf-template-canvas" data-existing-year-edit={coverYearText}>
@@ -3784,6 +3850,60 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                       placeholder="cc@example.com"
                     />
                   </div>
+                </label>
+
+                <label className="field full" style={{ marginTop: "0.75rem" }}>
+                  <span>หัวข้ออีเมล (Subject)</span>
+                  <input
+                    type="text"
+                    value={emailSubject}
+                    onChange={(e) => setEmailSubject(e.target.value)}
+                    placeholder="เช่น รายงานการตรวจสอบอาคารประจำปี"
+                  />
+                </label>
+
+                <label className="field full" style={{ marginTop: "0.75rem" }}>
+                  <span>เนื้อหาอีเมล (Message Body)</span>
+                  <textarea
+                    rows={4}
+                    style={{
+                      fontFamily: "inherit",
+                      fontSize: "0.95rem",
+                      lineHeight: "1.5",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      padding: "0.6rem 0.8rem",
+                      resize: "vertical",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      outline: "none"
+                    }}
+                    value={emailBody}
+                    onChange={(e) => setEmailBody(e.target.value)}
+                    placeholder="ข้อความที่ต้องการแจ้งให้ลูกค้าทราบ..."
+                  />
+                </label>
+
+                <label className="field full" style={{ marginTop: "0.75rem" }}>
+                  <span>คำลงท้าย (Sign-off)</span>
+                  <textarea
+                    rows={2}
+                    style={{
+                      fontFamily: "inherit",
+                      fontSize: "0.95rem",
+                      lineHeight: "1.5",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      padding: "0.6rem 0.8rem",
+                      resize: "vertical",
+                      width: "100%",
+                      boxSizing: "border-box",
+                      outline: "none"
+                    }}
+                    value={emailSignOff}
+                    onChange={(e) => setEmailSignOff(e.target.value)}
+                    placeholder="เช่น ขอแสดงความนับถือ, ทีมงาน TEST TRUE"
+                  />
                 </label>
 
                 <div className="report-file-card" style={{ marginTop: "1rem" }}>

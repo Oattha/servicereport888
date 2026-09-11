@@ -6,15 +6,18 @@ import { MyReportsPage } from "./pages/MyReportsPage";
 import { AllReportsPage } from "./pages/AllReportsPage";
 import { UsersPage } from "./pages/UsersPage";
 import { HomePage } from "./pages/HomePage";
+import { SignPortalPage } from "./pages/SignPortalPage"; // 1. import SignPortalPage
 import { onUnauthorized, setAuthToken } from "./lib/http";
 import type { AppSection, ReportDraft } from "./types";
 
 const persistentAuthKey = "service-report-authenticated";
 const sessionAuthKey = "service-report-session-authenticated";
 
-type EntryRoute = "home" | "building-login" | "service-login" | "app";
+// 2. เพิ่ม "sign-portal" ใน EntryRoute
+type EntryRoute = "home" | "building-login" | "service-login" | "app" | "sign-portal";
 
 function getEntryRoute(): EntryRoute {
+  if (window.location.pathname === "/sign-portal") return "sign-portal"; // 3. ดักจับ path /sign-portal
   if (window.location.pathname === "/building-login" || window.location.pathname === "/login") return "building-login";
   if (window.location.pathname === "/service-login") return "service-login";
   if (window.location.pathname === "/app") return "app";
@@ -35,7 +38,8 @@ export function App() {
       home: "/",
       "building-login": "/building-login",
       "service-login": "/service-login",
-      app: "/app"
+      app: "/app",
+      "sign-portal": "/sign-portal"
     }[route];
     window.history[replace ? "replaceState" : "pushState"]({}, "", path);
     setEntryRoute(route);
@@ -91,6 +95,11 @@ export function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // 4. ถ้าเข้ามาที่ /sign-portal ให้เปิดหน้า SignPortalPage ทันทีโดยไม่ต้องตรวจสถานะล็อกอิน
+  if (entryRoute === "sign-portal") {
+    return <SignPortalPage />;
+  }
 
   if (entryRoute === "home") {
     return (

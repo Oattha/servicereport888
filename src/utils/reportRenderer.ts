@@ -530,46 +530,6 @@ function removePage13ChecklistText(pdf: PDFDocument) {
   replacePageContentStreams(page, (content) => removeMarkedContentByMcids(content, page13ChecklistTextMcids));
 }
 
-async function createPage13Item235TextBytes() {
-  const scale = 4;
-  const width = 190;
-  const height = 16;
-  const canvas = document.createElement("canvas");
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Cannot prepare page 13 item 2.3.5 text");
-  const itemFont = new FontFace("Page13Item235CordiaNew", 'local("Cordia New")');
-  await itemFont.load();
-  document.fonts.add(itemFont);
-  context.fillStyle = "#000000";
-  context.textBaseline = "alphabetic";
-  context.textRendering = "geometricPrecision";
-  context.font = `${15 * scale}px "Page13Item235CordiaNew"`;
-  context.fillText("2.3.5 ระบบลิฟต์ดับเพลิง", 0, 13.8 * scale);
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((nextBlob) => {
-      if (nextBlob) resolve(nextBlob);
-      else reject(new Error("Cannot encode page 13 item 2.3.5 text"));
-    }, "image/png");
-  });
-  return new Uint8Array(await blob.arrayBuffer());
-}
-
-async function replacePage13Item235Text(pdf: PDFDocument) {
-  const page = pdf.getPages()[12];
-  page.drawRectangle({
-    x: 82.5,
-    y: 607,
-    width: 426,
-    height: 20,
-    color: rgb(1, 1, 1)
-  });
-  const textBytes = await createPage13Item235TextBytes();
-  const textImage = await pdf.embedPng(textBytes);
-  page.drawImage(textImage, { x: 83.45, y: 613.25, width: 190, height: 16 });
-}
-
 async function imageUrlToCoverPngBytes(imageUrl: string, targetWidth: number, targetHeight: number) {
   const image = await loadImage(imageUrl);
   const placement = getCoverFitPlacement(targetWidth, targetHeight, image.naturalWidth, image.naturalHeight);
@@ -820,7 +780,11 @@ async function drawChecklistFrequencyHeaders(pdf: PDFDocument) {
   }
 }
 
-async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderState) {
+async function replaceDefaultHeaderLogos(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  targetPage?: number
+) {
   const logoUrl = DEFAULT_HEADER_LOGO_URL;
   const coverLogoBytes = await imageUrlToContainPngBytes(logoUrl, 240, 55, "left");
   const headerLogoBytes = await imageUrlToContainPngBytes(logoUrl, 210, 42, "left");
@@ -828,6 +792,7 @@ async function replaceDefaultHeaderLogos(pdf: PDFDocument, state: ReportRenderSt
   const headerLogo = await pdf.embedPng(headerLogoBytes);
 
   pdf.getPages().forEach((page, index) => {
+    if (targetPage && index !== targetPage - 1) return;
     const resources = page.node.Resources();
     const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
     if (!xObjects) return;
@@ -1025,7 +990,7 @@ async function createPage14PermitTextImageBytes(state: ReportRenderState) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 14 permit text overlay");
 
-  const permitFont = new FontFace("Page14PermitCordiaNew", 'local("Cordia New")');
+  const permitFont = new FontFace("Page14PermitCordiaNew", 'url("/fonts/leelawad.ttf")');
   await permitFont.load();
   document.fonts.add(permitFont);
 
@@ -1094,7 +1059,7 @@ async function createPage14ControlledUseDateImageBytes(state: ReportRenderState)
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 14 controlled-use date overlay");
 
-  const dateFont = new FontFace("Page14ControlledUseCordiaNew", 'local("Cordia New")');
+  const dateFont = new FontFace("Page14ControlledUseCordiaNew", 'url("/fonts/leelawad.ttf")');
   await dateFont.load();
   document.fonts.add(dateFont);
 
@@ -1181,7 +1146,7 @@ async function createPage17PartyImageBytes(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 17 party overlay");
 
-  const partyFont = new FontFace("Page17PartyCordiaNew", 'local("Cordia New")');
+  const partyFont = new FontFace("Page17PartyCordiaNew", 'url("/fonts/leelawad.ttf")');
   await partyFont.load();
   document.fonts.add(partyFont);
 
@@ -1240,7 +1205,7 @@ async function createPage17OtherTextImageBytes(state: ReportRenderState) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 17 other text overlay");
 
-  const otherFont = new FontFace("Page17OtherCordiaNew", 'local("Cordia New")');
+  const otherFont = new FontFace("Page17OtherCordiaNew", 'url("/fonts/leelawad.ttf")');
   await otherFont.load();
   document.fonts.add(otherFont);
 
@@ -1334,7 +1299,7 @@ async function createPage18TextOverlayBytes(state: ReportRenderState) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 18 text overlay");
 
-  const page18Font = new FontFace("Page18CordiaNew", 'local("Cordia New")');
+  const page18Font = new FontFace("Page18CordiaNew", 'url("/fonts/leelawad.ttf")');
   await page18Font.load();
   document.fonts.add(page18Font);
   context.fillStyle = "#000000";
@@ -1438,7 +1403,7 @@ async function createSection2EvidenceTextOverlayBytes(
   canvas.height = contentHeight * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare section 2 evidence text overlay");
-  const evidenceFont = new FontFace("Section2EvidenceCordiaNew", 'local("Cordia New")');
+  const evidenceFont = new FontFace("Section2EvidenceCordiaNew", 'url("/fonts/leelawad.ttf")');
   await evidenceFont.load();
   document.fonts.add(evidenceFont);
   context.textAlign = "center";
@@ -1535,7 +1500,7 @@ async function createPage23HeaderBytes() {
   canvas.height = Math.round(height * scale);
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 23 table header");
-  const headerFont = new FontFace("Page23CordiaNew", 'local("Cordia New")');
+  const headerFont = new FontFace("Page23CordiaNew", 'url("/fonts/leelawad.ttf")');
   await headerFont.load();
   document.fonts.add(headerFont);
   context.fillStyle = "#000000";
@@ -1558,21 +1523,21 @@ async function createPage23HeaderBytes() {
 
 async function createPage24Item2311TextBytes() {
   const scale = 4;
-  const width = 190;
+  const width = 172;
   const height = 18;
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
   canvas.height = height * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 24 item 2.3.11 text");
-  const itemFont = new FontFace("Page24Item2311CordiaNew", 'local("Cordia New")');
+  const itemFont = new FontFace("Page24Item2311Tahoma", 'url("/fonts/tahoma.ttf")');
   await itemFont.load();
   document.fonts.add(itemFont);
   context.fillStyle = "#000000";
   context.textBaseline = "alphabetic";
   context.textRendering = "geometricPrecision";
-  context.font = `${15 * scale}px "Page24Item2311CordiaNew"`;
-  context.fillText("2.3.11 แบบแปลนเพื่อการดับเพลิง", 0, 14 * scale);
+  context.font = `${9 * scale}px "Page24Item2311Tahoma"`;
+  context.fillText("2.3.11 แบบแปลนเพื่อการดับเพลิง", 0, 12 * scale);
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((nextBlob) => {
       if (nextBlob) resolve(nextBlob);
@@ -1598,7 +1563,7 @@ async function createPage23RemarkOverlayBytes(
   canvas.height = height * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 23 remark overlay");
-  const remarkFont = new FontFace("Page23RemarkCordiaNew", 'local("Cordia New")');
+  const remarkFont = new FontFace("Page23RemarkCordiaNew", 'url("/fonts/leelawad.ttf")');
   await remarkFont.load();
   document.fonts.add(remarkFont);
   context.fillStyle = "#000000";
@@ -1720,7 +1685,7 @@ async function replacePage23Table(pdf: PDFDocument, state: ReportRenderState) {
   });
 }
 
-function drawLeftWrappedText(
+function drawRightWrappedText(
   page: ReturnType<PDFDocument["getPages"]>[number],
   font: PDFFont,
   text: string,
@@ -1746,7 +1711,7 @@ function drawLeftWrappedText(
   visibleLines.forEach((line, index) => {
     const textWidth = font.widthOfTextAtSize(line, fontSize);
     page.drawText(line, {
-      x: index === 0 ? x : x + maxWidth - textWidth,
+      x: x + maxWidth - textWidth,
       y: firstBaseline - index * lineHeight,
       size: fontSize,
       font,
@@ -1786,7 +1751,7 @@ async function replacePage24Table(pdf: PDFDocument, state: ReportRenderState) {
 
   const item2311Bytes = await createPage24Item2311TextBytes();
   const item2311Text = await pdf.embedPng(item2311Bytes);
-  page.drawImage(item2311Text, { x: 110, y: 486.52, width: 190, height: 18 });
+  page.drawImage(item2311Text, { x: 110, y: 486.52, width: 172, height: 18 });
 
   const resultCenters = {
     usable: tableLeft + statusColumnWidth * 0.5,
@@ -1860,7 +1825,7 @@ async function createPage25TextOverlayBytes(state: ReportRenderState) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare page 25 text overlay");
 
-  const page25Font = new FontFace("Page25CordiaNew", 'local("Cordia New")');
+  const page25Font = new FontFace("Page25CordiaNew", 'url("/fonts/leelawad.ttf")');
   await page25Font.load();
   document.fonts.add(page25Font);
   context.fillStyle = "#000000";
@@ -2074,6 +2039,18 @@ async function createAnnualAssessmentPageBytes(state: ReportRenderState) {
   const ownerCompany = getFieldValue(state, "owner_company");
   const buildingName = getFieldValue(state, "building_name");
   const reportYear = getFieldValue(state, "cover_year") || "2569";
+  const inspectorRegistrationNumber =
+    getFieldValue(state, "inspector_registration_number").trim() || `น.0388/${reportYear}`;
+  const page17Owner = resolvePage17Party(state.fieldValues, state.page17Owner);
+  const page17OwnerAddress = [
+    page17Owner.house_number ? `เลขที่ ${page17Owner.house_number}` : "",
+    page17Owner.moo ? `หมู่ที่ ${page17Owner.moo}` : "",
+    page17Owner.road ? `ถนน ${page17Owner.road}` : "",
+    page17Owner.subdistrict ? `ตำบล/แขวง ${page17Owner.subdistrict}` : "",
+    page17Owner.district ? `อำเภอ/เขต ${page17Owner.district}` : "",
+    page17Owner.province ? `จังหวัด ${page17Owner.province}` : "",
+    page17Owner.postal_code
+  ].filter(Boolean).join(" ");
   context.textAlign = "left";
   context.fillStyle = "#111827";
   context.font = '11.2px "AnnualAssessmentTahoma", Tahoma, sans-serif';
@@ -2125,7 +2102,7 @@ async function createAnnualAssessmentPageBytes(state: ReportRenderState) {
   context.font = '10px "AnnualAssessmentTahoma", Tahoma, sans-serif';
   cursorY = drawAnnualAssessmentWrappedText(
     context,
-    `ผู้ตรวจสอบประเภทนิติบุคคล ทะเบียนเลขที่ น.0388/${reportYear} กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย โดยนาม บริษัท โปรวิชั่น อินสเปคเตอร์ จำกัด 89/115 หมู่บ้านพฤกษาวิลล์ 76 หมู่ที่ 1 ตำบลบางพลีใหญ่ อำเภอบางพลี สมุทรปราการ 10530`,
+    `ผู้ตรวจสอบประเภทนิติบุคคล ทะเบียนเลขที่ ${inspectorRegistrationNumber} กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย โดยนาม ${ownerCompany}${page17OwnerAddress ? ` ${page17OwnerAddress}` : ""}`,
     38,
     cursorY + 18,
     464,
@@ -2187,14 +2164,11 @@ async function createAnnualFooterPageNumberBytes(pageNumber: number) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare annual footer page number");
 
-  const cordiaFont = new FontFace("AnnualFooterCordiaNew", 'local("Cordia New")');
-  const calibriFont = new FontFace("AnnualFooterCalibri", 'local("Calibri")');
+  const footerFont = new FontFace("AnnualFooterTahoma", 'url("/fonts/tahoma.ttf")');
   try {
-    const [loadedCordia, loadedCalibri] = await Promise.all([cordiaFont.load(), calibriFont.load()]);
-    document.fonts.add(loadedCordia);
-    document.fonts.add(loadedCalibri);
+    document.fonts.add(await footerFont.load());
   } catch {
-    // The Windows font stack below remains a safe visual fallback.
+    // The bundled font normally loads first; this remains a visual fallback.
   }
 
   context.scale(scale, scale);
@@ -2202,16 +2176,12 @@ async function createAnnualFooterPageNumberBytes(pageNumber: number) {
   context.fillRect(0, 0, width, height);
   context.fillStyle = "#000000";
   context.textBaseline = "alphabetic";
-  context.textAlign = "left";
+  context.textAlign = "right";
 
-  // Match the mixed font sizes and exact baseline positions of the original
-  // template footer (for example, page 22) instead of using one small font.
-  context.font = '27.96px "AnnualFooterCordiaNew", "Cordia New", Tahoma, sans-serif';
-  context.fillText(String(pageNumber), 27.13, 18.81);
-  context.font = '14.04px "AnnualFooterCalibri", Calibri, Arial, sans-serif';
-  context.fillText("I", 49.99, 18.72);
-  context.font = '14.04px "AnnualFooterCordiaNew", "Cordia New", Tahoma, sans-serif';
-  context.fillText("Page", 57.42, 18.5);
+  // Use one packaged font and one baseline so the number, separator, and label
+  // remain balanced in PDF.js, Safari, and iOS embedded browsers.
+  context.font = '13px "AnnualFooterTahoma", Tahoma, Arial, sans-serif';
+  context.fillText(`${pageNumber} | Page`, 82, 20);
 
   context.strokeStyle = "#7f7f7f";
   context.lineWidth = 1;
@@ -2229,9 +2199,11 @@ async function createAnnualFooterPageNumberBytes(pageNumber: number) {
   return new Uint8Array(await blob.arrayBuffer());
 }
 
-async function replaceAnnualFooterPageNumbers(pdf: PDFDocument) {
+async function replaceAnnualFooterPageNumbers(pdf: PDFDocument, targetPage?: number) {
+  const firstPage = targetPage && targetPage >= 23 && targetPage <= 26 ? targetPage : 23;
+  const lastPage = targetPage && targetPage >= 23 && targetPage <= 26 ? targetPage : 26;
 
-  for (let pageNumber = 23; pageNumber <= 26; pageNumber += 1) {
+  for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
     const page = pdf.getPages()[pageNumber - 1];
     if (!page) continue;
 
@@ -2318,7 +2290,7 @@ async function replaceCoverText(pdf: PDFDocument, state: ReportRenderState) {
   const buildingDescription = selectedBuildingTypes.join(" / ");
 
   drawCenteredText(page, thaiFont, `${ownerCompany} (${buildingName})`, 270, 111, 470, 22);
-  drawLeftWrappedText(page, thaiFont, buildingDescription, 60, 72, 420, 20, 2);
+  drawRightWrappedText(page, thaiFont, buildingDescription, 60, 72, 420, 20, 2);
 }
 
 function drawCanvasWrappedText(
@@ -2452,7 +2424,7 @@ async function createGeneralBuildingInfoImageBytes(state: ReportRenderState) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare general building info overlay");
 
-  const page14Font = new FontFace("Page14CordiaNew", 'local("Cordia New")');
+  const page14Font = new FontFace("Page14CordiaNew", 'url("/fonts/leelawad.ttf")');
   await page14Font.load();
   document.fonts.add(page14Font);
 
@@ -2570,10 +2542,15 @@ async function replaceChecklistMarks(pdf: PDFDocument, state: ReportRenderState)
   }
 }
 
-async function replacePdfImageXObjects(pdf: PDFDocument, state: ReportRenderState) {
+async function replacePdfImageXObjects(
+  pdf: PDFDocument,
+  state: ReportRenderState,
+  targetPage?: number
+) {
   const pages = pdf.getPages();
 
   for (const slot of imageSlots) {
+    if (targetPage && slot.page !== targetPage) continue;
     if (!slot.xObjectName) continue;
     const edit = state.imageEdits[slot.key];
     if (!edit) continue;
@@ -2601,6 +2578,29 @@ async function replaceDefaultCoverBuildingPhoto(pdf: PDFDocument, state: ReportR
   const imageBytes = await fetchBytes("/templates/assets/cover-building-without-04.png");
   const image = await pdf.embedPng(imageBytes);
   xObjects.set(PDFName.of("Im0"), image.ref);
+}
+
+async function removeCoverLineQr(pdf: PDFDocument) {
+  const page = pdf.getPages()[0];
+  if (!page) return;
+  const resources = page.node.Resources();
+  const xObjects = asPdfNameMap(resources?.lookup(PDFName.of("XObject")));
+  if (!xObjects?.has(PDFName.of("Im3"))) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 2;
+  canvas.height = 2;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Cannot prepare transparent cover QR replacement");
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Cannot encode transparent cover QR replacement"));
+    }, "image/png");
+  });
+  const transparentImage = await pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
+  xObjects.set(PDFName.of("Im3"), transparentImage.ref);
 }
 
 
@@ -3300,7 +3300,7 @@ async function createMaintenancePlanSummaryTextOverlayBytes(
   canvas.height = 780 * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare maintenance plan summary text overlay");
-  const font = new FontFace("MaintenancePage18CordiaNew", 'local("Cordia New")');
+  const font = new FontFace("MaintenancePage18CordiaNew", 'url("/fonts/leelawad.ttf")');
   await font.load();
   document.fonts.add(font);
   context.fillStyle = "#000000";
@@ -3421,9 +3421,10 @@ function drawMaintenancePlanPage19SignatureText(
   centerTop: number,
   maxWidth: number,
   scale: number,
-  italic = false
+  italic = false,
+  initialFontSize = 17
 ) {
-  let fontSize = 17;
+  let fontSize = initialFontSize;
   do {
     context.font = `${italic ? "italic " : ""}${fontSize * scale}px "MaintenancePage19SignatureCordiaNew"`;
     if (context.measureText(text).width <= maxWidth * scale || fontSize <= 10) break;
@@ -3434,7 +3435,8 @@ function drawMaintenancePlanPage19SignatureText(
 
 async function createMaintenancePlanPage19SignatureOverlayBytes(
   typedSignature: string,
-  signerName: string
+  signerName: string,
+  inspectionDate: string
 ) {
   const scale = 6;
   const canvas = document.createElement("canvas");
@@ -3442,7 +3444,7 @@ async function createMaintenancePlanPage19SignatureOverlayBytes(
   canvas.height = 780 * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Cannot prepare maintenance plan page 19 signature overlay");
-  const font = new FontFace("MaintenancePage19SignatureCordiaNew", 'local("Cordia New")');
+  const font = new FontFace("MaintenancePage19SignatureCordiaNew", 'url("/fonts/leelawad.ttf")');
   await font.load();
   document.fonts.add(font);
   context.fillStyle = "#000000";
@@ -3455,6 +3457,20 @@ async function createMaintenancePlanPage19SignatureOverlayBytes(
   }
   if (signerName) {
     drawMaintenancePlanPage19SignatureText(context, signerName, 221.5, 669, 174, scale);
+  }
+  const thaiDate = formatPage25ThaiDate(inspectionDate);
+  if (thaiDate) {
+    const dateWithoutLeadingZero = thaiDate.replace(/^0/, "");
+    drawMaintenancePlanPage19SignatureText(
+      context,
+      `วัน เดือน ปี ที่ตรวจ ${dateWithoutLeadingZero}`,
+      221.5,
+      699,
+      235,
+      scale,
+      false,
+      12.5
+    );
   }
 
   const blob = await new Promise<Blob>((resolve, reject) => {
@@ -3471,6 +3487,7 @@ async function replaceMaintenancePlanPage19Signature(pdf: PDFDocument, state: Re
   if (!page) return;
   const typedSignature = state.maintenancePlanPage19Signature.typedSignature.trim();
   const signerName = state.maintenancePlanPage19Signature.signerName.trim();
+  const inspectionDate = state.maintenancePlanPage19Signature.inspectionDate?.trim() ?? "";
   const signatureEdit = state.imageEdits.maintenance_page19_signature;
 
   if (typedSignature && !signatureEdit) {
@@ -3479,10 +3496,14 @@ async function replaceMaintenancePlanPage19Signature(pdf: PDFDocument, state: Re
   if (signerName) {
     page.drawRectangle({ x: 131, y: 102, width: 181, height: 20, color: rgb(1, 1, 1) });
   }
-  if ((typedSignature && !signatureEdit) || signerName) {
+  if (inspectionDate) {
+    page.drawRectangle({ x: 128, y: 68, width: 235, height: 27, color: rgb(1, 1, 1) });
+  }
+  if ((typedSignature && !signatureEdit) || signerName || inspectionDate) {
     const overlayBytes = await createMaintenancePlanPage19SignatureOverlayBytes(
       signatureEdit ? "" : typedSignature,
-      signerName
+      signerName,
+      inspectionDate
     );
     const overlay = await pdf.embedPng(overlayBytes);
     page.drawImage(overlay, { x: 0, y: 0, width: 540, height: 780 });
@@ -3607,6 +3628,44 @@ async function replaceSignMaintenancePlanValues(pdf: PDFDocument, state: ReportR
         color: rgb(0, 0, 0)
       });
     });
+  }
+
+  const inspectionDate = state.signMaintenanceForm?.inspectionDate?.trim() ?? "";
+  const thaiDate = formatPage25ThaiDate(inspectionDate).replace(/^0/, "");
+  const page7 = pdf.getPages()[6];
+  if (page7) {
+    page7.drawRectangle({ x: 325, y: 75, width: 160, height: 26, color: rgb(1, 1, 1) });
+    if (thaiDate) {
+      page7.drawRectangle({ x: 284, y: 39, width: 236, height: 27, color: rgb(1, 1, 1) });
+    }
+
+    const scale = 6;
+    const canvas = document.createElement("canvas");
+    canvas.width = 540 * scale;
+    canvas.height = 780 * scale;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Cannot prepare sign maintenance page 7 inspection date overlay");
+    const dateFont = new FontFace("SignMaintenancePage7Date", 'url("/fonts/leelawad.ttf")');
+    await dateFont.load();
+    document.fonts.add(dateFont);
+    context.fillStyle = "#000000";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.textRendering = "geometricPrecision";
+    context.font = `${12.5 * scale}px "SignMaintenancePage7Date"`;
+    context.fillText("( นายสนทยา คำภีร์ทอง )", 397 * scale, 693 * scale);
+    if (thaiDate) {
+      context.fillText(`วัน เดือน ปี ที่ตรวจ ${thaiDate}`, 402 * scale, 727 * scale);
+    }
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((nextBlob) => {
+        if (nextBlob) resolve(nextBlob);
+        else reject(new Error("Cannot encode sign maintenance page 7 inspection date overlay"));
+      }, "image/png");
+    });
+    const overlay = await pdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
+    page7.drawImage(overlay, { x: 0, y: 0, width: 540, height: 780 });
   }
 }
 
@@ -4029,6 +4088,95 @@ async function replaceSignInspectionPage15Values(pdf: PDFDocument, state: Report
     drawPage23CheckMark(page, (left + right) / 2, centerY);
   }
 
+  pdf.registerFontkit(fontkit);
+  const fontBytes = await getTahomaFontBuffer();
+  const thaiFont = await pdf.embedFont(fontBytes, { subset: true });
+  const inspectorName = "นายสนทยา คำภีร์ทอง";
+  const inspectionDate = formatPage25ThaiDate(
+    getFieldValue(state, "sign_inspection_page15_date") || "2025-06-24"
+  );
+
+  const inspectorNameBox = { x: 96, y: 218, width: 205, height: 25 };
+  page.drawRectangle({ ...inspectorNameBox, color: rgb(1, 1, 1) });
+  drawCenteredText(
+    page,
+    thaiFont,
+    `( ${inspectorName} )`,
+    inspectorNameBox.x + inspectorNameBox.width / 2,
+    inspectorNameBox.y + 7,
+    inspectorNameBox.width,
+    9
+  );
+
+  const inspectionDateBox = { x: 96, y: 184, width: 215, height: 25 };
+  page.drawRectangle({ ...inspectionDateBox, color: rgb(1, 1, 1) });
+  drawCenteredText(
+    page,
+    thaiFont,
+    inspectionDate ? `วันที่ ${inspectionDate}` : "วันที่ ........................................",
+    inspectionDateBox.x + inspectionDateBox.width / 2,
+    inspectionDateBox.y + 7,
+    inspectionDateBox.width,
+    9
+  );
+
+  const registrationNumber = getFieldValue(state, "sign_inspection_page15_registration_number")
+    || "น.0277/2560";
+  const page4Details = state.signInspectionPage4State;
+  const signDetailsBox = { x: 38, y: 26, width: 470, height: 96 };
+  page.drawRectangle({ ...signDetailsBox, color: rgb(1, 1, 1) });
+  const headingText = "เลขทะเบียนผู้ตรวจสอบ";
+  const headingSize = 13;
+  page.drawText(headingText, {
+    x: signDetailsBox.x + 1,
+    y: 107,
+    size: headingSize,
+    font: thaiFont,
+    color: rgb(0, 0, 0)
+  });
+  page.drawLine({
+    start: { x: signDetailsBox.x + 1, y: 105 },
+    end: {
+      x: signDetailsBox.x + 1 + thaiFont.widthOfTextAtSize(headingText, headingSize),
+      y: 105
+    },
+    thickness: 0.5,
+    color: rgb(0, 0, 0)
+  });
+
+  const signDetailsSize = 11;
+  const registrationFirstLine = `ผู้ตรวจสอบประเภทนิติบุคคล ทะเบียนเลขที่ ${registrationNumber}`;
+  const registrationSecondLine = "กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย";
+  const signNameLine = `ชื่อป้าย ${page4Details.signName.trim() || "-"}`;
+  const addressLines = wrapText(
+    thaiFont,
+    `ที่อยู่ ${page4Details.address.trim() || "-"}`,
+    signDetailsBox.width - 4,
+    signDetailsSize
+  ).slice(0, 2);
+  const contactLine = `โทรศัพท์ ${page4Details.phone.trim() || "-"}    โทรสาร ${page4Details.fax.trim() || "-"}`;
+  const signDetailsLines = [
+    registrationFirstLine,
+    registrationSecondLine,
+    signNameLine,
+    ...addressLines,
+    contactLine
+  ];
+  signDetailsLines.forEach((line, index) => {
+    const fontSize = fitFontSize(thaiFont, line, signDetailsBox.width - 4, signDetailsSize);
+    page.drawText(line, {
+      x: signDetailsBox.x + 1,
+      y: 92 - index * 12.3,
+      size: fontSize,
+      font: thaiFont,
+      color: rgb(0, 0, 0)
+    });
+  });
+
+  const footerBytes = await createAnnualFooterPageNumberBytes(15);
+  const footerImage = await pdf.embedPng(footerBytes);
+  page.drawImage(footerImage, { x: 445, y: 0, width: 85, height: 42 });
+
 }
 
 async function replaceSignInspectionPage14Images(pdf: PDFDocument, state: ReportRenderState) {
@@ -4126,7 +4274,7 @@ async function replaceSignInspectionPage4Values(pdf: PDFDocument, state: ReportR
       `ที่อยู่ ${page4State.address}`,
       `โทรศัพท์ ${page4State.phone}    โทรสาร ${page4State.fax}`
     ].join("\n"),
-    9
+    11
   );
   drawWrappedBox(
     { x: 34, top: 257, width: 430, height: 22 },
@@ -4637,8 +4785,23 @@ async function replaceSignInspectionCoverValues(pdf: PDFDocument, state: ReportR
     state.fieldValues[signInspectionCoverFieldKeys.description]
       ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.description]
   ).trim();
+  const companyName = (
+    state.fieldValues[signInspectionCoverFieldKeys.companyName]
+      ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.companyName]
+  ).trim();
   const descriptionBox = { x: 28, y: 67, width: 484, height: 87 };
   page.drawRectangle({ ...descriptionBox, color: rgb(1, 1, 1) });
+  if (companyName) {
+    const companyNameSize = fitFontSize(thaiFont, companyName, descriptionBox.width - 12, 19);
+    const companyNameWidth = thaiFont.widthOfTextAtSize(companyName, companyNameSize);
+    page.drawText(companyName, {
+      x: descriptionBox.x + (descriptionBox.width - companyNameWidth) / 2,
+      y: 137,
+      size: companyNameSize,
+      font: thaiFont,
+      color: darkBlue
+    });
+  }
   let descriptionSize = 20;
   let descriptionLines: string[] = [];
   do {
@@ -4650,11 +4813,11 @@ async function replaceSignInspectionCoverValues(pdf: PDFDocument, state: ReportR
     descriptionSize -= 0.5;
   } while (descriptionSize > 13);
   descriptionLines = descriptionLines.slice(0, 2);
-  const lineYs = descriptionLines.length === 1 ? [101] : [116, 75];
+  const lineYs = descriptionLines.length === 1 ? [91] : [103, 74];
   descriptionLines.forEach((line, index) => {
     const textWidth = thaiFont.widthOfTextAtSize(line, descriptionSize);
     page.drawText(line, {
-      x: descriptionBox.x + (descriptionBox.width - textWidth) / 2,
+      x: descriptionBox.x + descriptionBox.width - textWidth - 8,
       y: lineYs[index],
       size: descriptionSize,
       font: thaiFont,
@@ -4665,6 +4828,7 @@ async function replaceSignInspectionCoverValues(pdf: PDFDocument, state: ReportR
 }
 
 export async function createReportPdf(state: ReportRenderState, targetPage?: number) {
+  const reportYear = getFieldValue(state, "cover_year") || "2569";
   if (state.templateId === "sign-maintenance-plan") {
     const template = getReportTemplate(state.templateId);
     const templateBytes = await fetch(template.pdfUrl).then((response) => {
@@ -4673,7 +4837,7 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     });
     const pdf = await PDFDocument.load(templateBytes);
     await replaceSignMaintenancePlanValues(pdf, state);
-    await replaceTemplateHeaderYears(pdf, [3, 4, 5, 6, 7]);
+    await replaceTemplateHeaderYears(pdf, [3, 4, 5, 6, 7], reportYear);
 
     if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
       const previewPdf = await PDFDocument.create();
@@ -4702,7 +4866,7 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     removeMixingWorkshopPage35InspectionDate(pdf);
     // Pages 23-32 keep their original tables and values from the template.
     replaceMixingWorkshopPages34To35Values(pdf, state, thaiFont);
-    await replaceTemplateHeaderYears(pdf, Array.from({ length: 34 }, (_, index) => index + 2));
+    await replaceTemplateHeaderYears(pdf, Array.from({ length: 34 }, (_, index) => index + 2), reportYear);
 
     if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
       const previewPdf = await PDFDocument.create();
@@ -4730,7 +4894,7 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     await replaceSignInspectionPage13Values(pdf, state);
     await replaceSignInspectionPage14Images(pdf, state);
     await replaceSignInspectionPage15Values(pdf, state);
-    await replaceTemplateHeaderYears(pdf, Array.from({ length: 13 }, (_, index) => index + 3));
+    await replaceTemplateHeaderYears(pdf, Array.from({ length: 13 }, (_, index) => index + 3), reportYear);
 
     if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
       const previewPdf = await PDFDocument.create();
@@ -4771,11 +4935,9 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
 
       const pdf = await PDFDocument.load(templateBytes);
 
-      replaceMaintenancePlanPage7Checks(pdf, state);
-      replaceMaintenancePlanPage8Checks(pdf, state);
-      replaceMaintenancePlanPages9To16Checks(pdf, state);
       await replaceMaintenancePlanPage18Values(pdf, state);
       await replaceMaintenancePlanPage19Values(pdf, state);
+      await replaceTemplateHeaderYears(pdf, Array.from({ length: 18 }, (_, index) => index + 2), reportYear);
 
       if (targetPage && targetPage >= 1 && targetPage <= pdf.getPageCount()) {
         const previewPdf = await PDFDocument.create();
@@ -4820,17 +4982,29 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
       });
     }
 
-    await executeStep("ส่วนหัวกระดาษ (Default Header Logos)", () => replaceDefaultHeaderLogos(pdf, state));
-
-    if (!targetPage || targetPage === 13) {
-      await executeStep("หน้า 13 (Item 2.3.5 Text)", () => replacePage13Item235Text(pdf));
+    const annualHeaderPages = targetPage
+      ? (targetPage >= 2 && targetPage <= 25 ? [targetPage] : [])
+      : Array.from({ length: 24 }, (_, index) => index + 2);
+    if (annualHeaderPages.length > 0) {
+      await executeStep("ปีรายงานบนหัวกระดาษ", () => (
+        replaceTemplateHeaderYears(pdf, annualHeaderPages, reportYear)
+      ));
     }
+
+    await executeStep("ส่วนหัวกระดาษ (Default Header Logos)", () => (
+      replaceDefaultHeaderLogos(pdf, state, targetPage)
+    ));
 
     if (!targetPage || targetPage === 1) {
       await executeStep("หน้า 1 (Cover Building Photo)", () => replaceDefaultCoverBuildingPhoto(pdf, state));
     }
 
-    await executeStep("รูปภาพ XObjects ทั้งหมดในเอกสาร", () => replacePdfImageXObjects(pdf, state));
+    await executeStep("รูปภาพ XObjects ทั้งหมดในเอกสาร", () => (
+      replacePdfImageXObjects(pdf, state, targetPage)
+    ));
+    if (!targetPage || targetPage === 1) {
+      await executeStep("นำ QR / ID LINE ออกจากหน้าปก", () => removeCoverLineQr(pdf));
+    }
 
     if (!targetPage || targetPage === 15) {
       await executeStep("หน้า 15 (Map Image Slot)", () => replaceMapImageSlot(pdf, state));
@@ -4873,7 +5047,9 @@ export async function createReportPdf(state: ReportRenderState, targetPage?: num
     }
 
     if (!targetPage || (targetPage >= 23 && targetPage <= 26)) {
-      await executeStep("หน้า 23-26 (Footer Page Numbers)", () => replaceAnnualFooterPageNumbers(pdf));
+      await executeStep("หน้า 23-26 (Footer Page Numbers)", () => (
+        replaceAnnualFooterPageNumbers(pdf, targetPage)
+      ));
     }
 
     if (!targetPage || targetPage === 12 || targetPage === 13) {

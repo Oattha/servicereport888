@@ -157,6 +157,9 @@ export const templateFields: TemplateField[] = [
 
 export const defaultTemplateFieldValues: Record<string, string> = {
   cover_year: "2568",
+  inspector_registration_number: "น.0388/2568",
+  sign_inspection_page15_date: "2025-06-24",
+  sign_inspection_page15_registration_number: "น.0277/2560",
   owner_company: "บริษัท บางชันเยนเนอเรลเซชเมนส์ จำกัด",
   building_name: "อาคาร WS",
   building_address:
@@ -180,19 +183,6 @@ export const imageSlots: TemplateImageSlot[] = [
     height: 525,
     recommendedSize: "16:7 หรือ 1600 x 700 px",
     xObjectName: "Im0",
-    locked: true
-  },
-  {
-    key: "cover_line_qr",
-    label: "QR / ID LINE บนหน้าปก",
-    page: 1,
-    type: "image",
-    x: 810,
-    y: 865,
-    width: 145,
-    height: 145,
-    recommendedSize: "สี่เหลี่ยมจัตุรัส เช่น 600 x 600 px",
-    xObjectName: "Im3",
     locked: true
   },
   {

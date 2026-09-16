@@ -121,9 +121,20 @@ export function ReportPdfPreview({ page, renderState, zoom }: ReportPdfPreviewPr
         const baseViewport = pdfPage.getViewport({ scale: 1 });
         const containerWidth = previewWidth || canvas.parentElement?.clientWidth || canvas.clientWidth || baseViewport.width;
         const displayWidth = containerWidth * (zoom / 100);
-        const deviceScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), 1.5);
+        // The annual template contains considerably smaller Thai body text than the
+        // other reports. Keep its sharper desktop rendering, but cap the canvas on
+        // iOS/iPadOS where a 3x full-page canvas can exhaust WebKit's memory.
+        const isAnnualInspection = renderState.templateId === "annual-inspection";
+        const isAppleMobile =
+          /iPad|iPhone|iPod/i.test(navigator.userAgent)
+          || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+        const useMemorySafeAnnualScale = isAnnualInspection && isAppleMobile;
+        const deviceScaleLimit = useMemorySafeAnnualScale ? 1.5 : isAnnualInspection ? 2.5 : 1.5;
+        const renderScaleMinimum = useMemorySafeAnnualScale ? 1.2 : isAnnualInspection ? 2 : 1.2;
+        const renderScaleLimit = useMemorySafeAnnualScale ? 1.6 : isAnnualInspection ? 3 : 1.5;
+        const deviceScale = Math.min(Math.max(window.devicePixelRatio || 1, 1), deviceScaleLimit);
         const fittedScale = (displayWidth / baseViewport.width) * deviceScale;
-        const renderScale = Math.min(Math.max(fittedScale, 1.2), 1.5);
+        const renderScale = Math.min(Math.max(fittedScale, renderScaleMinimum), renderScaleLimit);
         const viewport = pdfPage.getViewport({ scale: renderScale });
 
         canvas.width = Math.ceil(viewport.width);

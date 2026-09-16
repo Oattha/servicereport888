@@ -316,6 +316,10 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
         : initialState?.fieldValues?.[signInspectionCoverFieldKeys.yearSuffix]
         ?? defaultSignInspectionCoverFields[signInspectionCoverFieldKeys.yearSuffix]
   });
+  const [pendingReportYear, setPendingReportYear] = useState(
+    initialState?.fieldValues?.cover_year?.replace(/\D/g, "").slice(0, 4)
+      || String(new Date().getFullYear() + 543)
+  );
 
   const [mapLocation, setMapLocation] = useState<MapLocationValue>({
     ...defaultMapLocation,
@@ -364,6 +368,9 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
     ...initialState?.maintenancePlanPage19Signature
   });
   const [signMaintenanceForm, setSignMaintenanceForm] = useState(() => ({
+    inspectionDate:
+      initialState?.signMaintenanceForm?.inspectionDate
+      ?? defaultSignMaintenanceFormState.inspectionDate,
     choices: {
       ...defaultSignMaintenanceFormState.choices,
       ...initialState?.signMaintenanceForm?.choices
@@ -823,6 +830,16 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   function updateMapLocation(value: MapLocationValue) {
     setMapLocation(value);
     setMapLocationRevision((current) => current + 1);
+  }
+
+  function applyReportYearToAllTemplates() {
+    const normalizedYear = pendingReportYear.replace(/\D/g, "").slice(0, 4);
+    if (normalizedYear.length !== 4) return;
+    setFieldValues((current) => ({
+      ...current,
+      cover_year: normalizedYear,
+      [signInspectionCoverFieldKeys.yearSuffix]: normalizedYear.slice(-2)
+    }));
   }
 
   const coverYearText = getFieldValue("cover_year");
@@ -1323,6 +1340,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   function clearSignMaintenancePage() {
     const pageKeys = new Set(currentSignMaintenanceRows.map((row) => row.key));
     setSignMaintenanceForm((current) => ({
+      ...current,
       choices: Object.fromEntries(
         Object.entries(current.choices).map(([key, value]) => [key, pageKeys.has(key) ? null : value])
       ),
@@ -1382,7 +1400,7 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
   }
 
   function updateMaintenancePlanPage19Signature(
-    field: "typedSignature" | "signerName",
+    field: "typedSignature" | "signerName" | "inspectionDate",
     value: string
   ) {
     setMaintenancePlanPage19Signature((current) => ({ ...current, [field]: value }));
@@ -1643,6 +1661,30 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
             </div>
           ))}
         </div>
+
+        <section className="global-report-year-card" aria-label="ตั้งค่าปีรายงานทุก PDF">
+          <div>
+            <strong>ปีรายงานส่วนกลาง (พ.ศ.)</strong>
+            <small>ใช้ปีเดียวกันกับหัวกระดาษของ PDF ทุกแบบ</small>
+          </div>
+          <div className="global-report-year-controls">
+            <input
+              aria-label="ปีรายงานส่วนกลาง พ.ศ."
+              inputMode="numeric"
+              maxLength={4}
+              onChange={(event) => setPendingReportYear(event.target.value.replace(/\D/g, "").slice(0, 4))}
+              placeholder="2569"
+              value={pendingReportYear}
+            />
+            <button
+              disabled={pendingReportYear.length !== 4}
+              onClick={applyReportYearToAllTemplates}
+              type="button"
+            >
+              ใช้กับ PDF ทั้งหมด
+            </button>
+          </div>
+        </section>
 
         <section className="template-selector" aria-label="เลือกแบบ PDF">
           <strong>เลือกแบบ PDF</strong>
@@ -2244,6 +2286,22 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 </fieldset>
 
                 <fieldset className="page25-signature-section">
+                  <legend>ข้อมูลทะเบียนผู้ตรวจสอบ</legend>
+                  <div className="form-grid">
+                    <label className="field">
+                      <span>เลขทะเบียนผู้ตรวจสอบ</span>
+                      <input
+                        type="text"
+                        maxLength={40}
+                        placeholder="เช่น น.0388/2568"
+                        value={getFieldValue("inspector_registration_number")}
+                        onChange={(event) => updateFieldValue("inspector_registration_number", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </fieldset>
+
+                <fieldset className="page25-signature-section">
                   <legend>ผู้ตรวจสอบอาคาร</legend>
                   <div className="form-grid">
                     <label className="field">
@@ -2505,105 +2563,15 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </section>
             ) : null}
           </>
-        ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 7 ? (
-          <section className="builder-card checklist-card maintenance-page7-card">
-            <div className="checklist-header">
-              <span>หน้า {currentTemplatePage}</span>
-              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
-              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
-            </div>
-            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
-              <span>รายการตรวจบำรุงรักษา</span>
-              {maintenancePlanFrequencyOptions.map((option) => (
-                <strong key={option.key}>{option.label}</strong>
-              ))}
-            </div>
-            <div className="maintenance-frequency-list">
-              {maintenancePlanPage7Items.map((item) => (
-                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
-                  <span>{item.label}</span>
-                  {maintenancePlanFrequencyOptions.map((option) => (
-                    <label className="maintenance-frequency-radio" key={option.key}>
-                      <input
-                        checked={maintenancePlanPage7Checks[item.key] === option.key}
-                        name={`maintenance-page7-${item.key}`}
-                        onChange={() => selectMaintenancePlanFrequency(item.key, option.key)}
-                        type="radio"
-                      />
-                      <span className="maintenance-frequency-control" aria-hidden="true" />
-                      <span className="sr-only">{item.label} {option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : selectedTemplateId === "maintenance-plan" && currentTemplatePage === 8 ? (
-          <section className="builder-card checklist-card maintenance-page8-card">
-            <div className="checklist-header">
-              <span>หน้า {currentTemplatePage}</span>
-              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
-              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
-            </div>
-            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
-              <span>รายการตรวจบำรุงรักษา</span>
-              {maintenancePlanFrequencyOptions.map((option) => (
-                <strong key={option.key}>{option.label}</strong>
-              ))}
-            </div>
-            <div className="maintenance-frequency-list">
-              {maintenancePlanPage8Items.map((item) => (
-                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
-                  <span>{item.label}</span>
-                  {maintenancePlanFrequencyOptions.map((option) => (
-                    <label className="maintenance-frequency-radio" key={option.key}>
-                      <input
-                        checked={maintenancePlanPage8Checks[item.key] === option.key}
-                        name={`maintenance-page8-${item.key}`}
-                        onChange={() => selectMaintenancePlanPage8Frequency(item.key, option.key)}
-                        type="radio"
-                      />
-                      <span className="maintenance-frequency-control" aria-hidden="true" />
-                      <span className="sr-only">{item.label} {option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </section>
         ) : selectedTemplateId === "maintenance-plan"
-          && currentTemplatePage >= 9
+          && currentTemplatePage >= 7
           && currentTemplatePage <= 16 ? (
-          <section className="builder-card checklist-card maintenance-pages9-16-card">
-            <div className="checklist-header">
-              <span>หน้า {currentTemplatePage}</span>
-              <h2>ความถี่ในการตรวจบำรุงรักษา</h2>
-              <p>แต่ละรายการเลือกได้ 1 ความถี่ เมื่อเลือกช่องใหม่ ระบบจะยกเลิกช่องเดิมให้อัตโนมัติ</p>
-            </div>
-            <div className="maintenance-frequency-grid maintenance-frequency-head" aria-hidden="true">
-              <span>รายการตรวจบำรุงรักษา</span>
-              {maintenancePlanFrequencyOptions.map((option) => (
-                <strong key={option.key}>{option.label}</strong>
-              ))}
-            </div>
-            <div className="maintenance-frequency-list">
-              {currentMaintenancePlanFrequencyItems.map((item) => (
-                <div className="maintenance-frequency-grid maintenance-frequency-row" key={item.key}>
-                  <span>{item.label}</span>
-                  {maintenancePlanFrequencyOptions.map((option) => (
-                    <label className="maintenance-frequency-radio" key={option.key}>
-                      <input
-                        checked={maintenancePlanPages9To16Checks[item.key] === option.key}
-                        name={`maintenance-${item.key}`}
-                        onChange={() => selectMaintenancePlanPages9To16Frequency(item.key, option.key)}
-                        type="radio"
-                      />
-                      <span className="maintenance-frequency-control" aria-hidden="true" />
-                      <span className="sr-only">{item.label} {option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              ))}
+          <section className="builder-card template-readonly-card">
+            <FileText size={24} aria-hidden="true" />
+            <div>
+              <span className="page-kicker">หน้า {currentTemplatePage} / 19</span>
+              <h2>ข้อมูลคงที่ตาม PDF ต้นฉบับ</h2>
+              <p>ตารางหน้านี้ใช้ข้อมูลเดิมจาก Template และไม่เปิดให้แก้ไข</p>
             </div>
           </section>
         ) : selectedTemplateId === "maintenance-plan"
@@ -2722,6 +2690,18 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                       )}
                       placeholder="ชื่อ-นามสกุล"
                       value={maintenancePlanPage19Signature.signerName}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>วันที่ตรวจสอบ</span>
+                    <input
+                      aria-label="วันที่ตรวจสอบหน้า 19"
+                      onChange={(event) => updateMaintenancePlanPage19Signature(
+                        "inspectionDate",
+                        event.target.value
+                      )}
+                      type="date"
+                      value={maintenancePlanPage19Signature.inspectionDate ?? ""}
                     />
                   </label>
                 </div>
@@ -3464,6 +3444,42 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
               </div>
             </div>
 
+            <fieldset className="page25-signature-section">
+              <legend>ผู้ตรวจสอบอาคาร</legend>
+              <div className="form-grid">
+                <label className="field">
+                  <span>ชื่อผู้ตรวจสอบ</span>
+                  <input
+                    readOnly
+                    disabled
+                    style={{ backgroundColor: "#f1f5f9", cursor: "not-allowed", color: "#475569" }}
+                    value="นายสนทยา คำภีร์ทอง"
+                  />
+                </label>
+                <label className="field">
+                  <span>วันที่ลงนาม</span>
+                  <input
+                    type="date"
+                    value={getFieldValue("sign_inspection_page15_date") || "2025-06-24"}
+                    onChange={(event) => updateFieldValue("sign_inspection_page15_date", event.target.value)}
+                  />
+                </label>
+                <label className="field full">
+                  <span>เลขทะเบียนผู้ตรวจสอบ</span>
+                  <input
+                    type="text"
+                    maxLength={40}
+                    placeholder="เช่น น.0277/2560"
+                    value={getFieldValue("sign_inspection_page15_registration_number") || "น.0277/2560"}
+                    onChange={(event) => updateFieldValue(
+                      "sign_inspection_page15_registration_number",
+                      event.target.value
+                    )}
+                  />
+                </label>
+              </div>
+            </fieldset>
+
             <div className="sign-maintenance-table-wrap">
               <table className="sign-maintenance-table result">
                 <thead>
@@ -3539,6 +3555,26 @@ export function ReportsPage({ initialDraft = null, onDraftSaved, onReportComplet
                 </button>
               </div>
             </div>
+
+            {currentTemplatePage === 7 ? (
+              <fieldset className="page25-signature-section">
+                <legend>วันที่ตรวจสอบ</legend>
+                <div className="form-grid">
+                  <label className="field">
+                    <span>วันที่ด้านล่างหน้า 7</span>
+                    <input
+                      aria-label="วันที่ตรวจสอบแผนบำรุงรักษาป้ายหน้า 7"
+                      onChange={(event) => setSignMaintenanceForm((current) => ({
+                        ...current,
+                        inspectionDate: event.target.value
+                      }))}
+                      type="date"
+                      value={signMaintenanceForm.inspectionDate ?? ""}
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            ) : null}
 
             {currentSignMaintenanceRows.length === 0 ? (
               <div className="page-edit-empty">

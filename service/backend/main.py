@@ -813,14 +813,18 @@ def send_email_with_pdf(data: dict, pdf_path: str):
         fallback = str(info.get("email", "")).strip()
         recipients = [fallback] if fallback else []
 
-    api_key = os.getenv("BREVO_API_KEY", "").strip()
     sender_email = os.getenv("BREVO_SENDER_EMAIL", "").strip()
     sender_name = os.getenv("BREVO_SENDER_NAME", "Service Report").strip()
+    smtp_host = os.getenv("SMTP_HOST", "smtp-relay.brevo.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "").strip()
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+    smtp_secure = os.getenv("SMTP_SECURE", "false").strip().lower() == "true"
 
-    if not recipients or not api_key or not sender_email:
+    if not recipients or not smtp_user or not smtp_pass or not sender_email:
         message = (
             "Skipped sending "
-            f"(recipients={recipients}, missing BREVO_API_KEY or BREVO_SENDER_EMAIL)"
+            f"(recipients={recipients}, missing Brevo SMTP configuration)"
         )
         print(f"--> [EMAIL] {message}")
         return False, message
@@ -937,42 +941,47 @@ W) http://www.testtrue.co.th, Line) @testtrue, FB) testtruepage
     """
 
     results = []
-    for recipient in recipients:
-        payload = {
-            "sender": {"name": sender_name, "email": sender_email},
-            "to": [{"email": recipient}],
-            "subject": subject,
-            "textContent": text_content,
-            "htmlContent": html_content,
-        }
-        if attachment:
-            payload["attachment"] = [attachment]
+    try:
+        if smtp_secure:
+            smtp_connection = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=30)
+        else:
+            smtp_connection = smtplib.SMTP(smtp_host, smtp_port, timeout=30)
 
-        brevo_request = urllib.request.Request(
-            "https://api.brevo.com/v3/smtp/email",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-                "api-key": api_key,
-            },
-            method="POST",
-        )
+        with smtp_connection as server:
+            if not smtp_secure:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+            server.login(smtp_user, smtp_pass)
 
-        try:
-            with urllib.request.urlopen(brevo_request, timeout=30) as response:
-                response.read()
-            print(f"--> [EMAIL] Brevo sent successfully to {recipient}")
-            results.append({"to": recipient, "ok": True})
-        except urllib.error.HTTPError as error:
-            error_body = error.read().decode("utf-8", errors="replace")
-            error_message = f"Brevo API error {error.code}: {error_body}"
-            print(f"--> [EMAIL] Failed to send to {recipient}: {error_message}")
-            results.append({"to": recipient, "ok": False, "error": error_message})
-        except Exception as error:
-            error_message = f"Brevo connection error: {error}"
-            print(f"--> [EMAIL] Failed to send to {recipient}: {error_message}")
-            results.append({"to": recipient, "ok": False, "error": error_message})
+            for recipient in recipients:
+                try:
+                    message = EmailMessage()
+                    message["Subject"] = subject
+                    message["From"] = f"{sender_name} <{sender_email}>"
+                    message["To"] = recipient
+                    message.set_content(text_content)
+                    message.add_alternative(html_content, subtype="html")
+
+                    if attachment:
+                        message.add_attachment(
+                            base64.b64decode(attachment["content"]),
+                            maintype="application",
+                            subtype="pdf",
+                            filename=attachment["name"],
+                        )
+
+                    server.send_message(message)
+                    print(f"--> [EMAIL] Brevo SMTP sent successfully to {recipient}")
+                    results.append({"to": recipient, "ok": True})
+                except Exception as error:
+                    error_message = f"Brevo SMTP send error: {error}"
+                    print(f"--> [EMAIL] Failed to send to {recipient}: {error_message}")
+                    results.append({"to": recipient, "ok": False, "error": error_message})
+    except Exception as error:
+        error_message = f"Brevo SMTP connection error: {error}"
+        print(f"--> [EMAIL] {error_message}")
+        return False, error_message
 
     failed = [result for result in results if not result["ok"]]
     if not failed:

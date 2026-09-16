@@ -10,6 +10,7 @@ export type SignMaintenanceRemark = {
 };
 
 export type SignMaintenanceFormState = {
+  inspectionDate: string;
   choices: Record<string, SignMaintenanceChoice>;
   remarks: Record<string, SignMaintenanceRemark>;
 };
@@ -102,6 +103,7 @@ export const signMaintenanceRows: SignMaintenanceRow[] = [
 ];
 
 export const defaultSignMaintenanceFormState: SignMaintenanceFormState = {
+  inspectionDate: "2025-06-24",
   choices: Object.fromEntries(signMaintenanceRows.map((row) => [row.key, null])),
   remarks: Object.fromEntries(signMaintenanceRows.map((row) => [row.key, { kind: null, text: "" }]))
 };

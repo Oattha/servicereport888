@@ -51,7 +51,7 @@ export const reportTemplates: ReportTemplateDefinition[] = [
   {
     id: "sign-maintenance-plan",
     code: "TMP-SIGN-MAINTENANCE-PLAN",
-    name: "แผนปฏิบัติการการตรวจบํารุงรักษาป้าย",
+    name: "แผนปฏิบัติการการตรวจบำรุงรักษาป้าย",
     description: "แผนปฏิบัติการตรวจบำรุงรักษาป้ายและอุปกรณ์ประกอบ จำนวน 7 หน้า",
     pages: 7,
     pdfUrl: "/templates/sign-maintenance-plan.pdf?v=20260826-1",

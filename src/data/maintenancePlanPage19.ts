@@ -9,11 +9,13 @@ export type MaintenancePlanPage19Values = MaintenancePlanPage18Values;
 export type MaintenancePlanPage19SignatureState = {
   typedSignature: string;
   signerName: string;
+  inspectionDate: string;
 };
 
 export const defaultMaintenancePlanPage19Signature: MaintenancePlanPage19SignatureState = {
   typedSignature: "",
-  signerName: ""
+  signerName: "",
+  inspectionDate: "2025-11-04"
 };
 
 export const maintenancePlanPage19SignatureSlot: TemplateImageSlot = {

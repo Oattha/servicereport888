@@ -179,8 +179,11 @@ export async function autoMigrate(): Promise<void> {
       );
     `);
 
-    // 2.7 Migration Columns & Constraints สำหรับ reports และ customers
+    // 2.7 Migration Columns & Constraints สำหรับ users, reports และ customers
     const alterStatements = [
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_sign_in_at TIMESTAMPTZ;",
+      "ALTER TABLE users ALTER COLUMN username DROP NOT NULL;",
       "ALTER TABLE reports ADD COLUMN IF NOT EXISTS recipient_email VARCHAR(180);",
       "ALTER TABLE reports ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;",
       "ALTER TABLE reports ADD COLUMN IF NOT EXISTS data JSONB;",

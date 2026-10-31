@@ -15,3 +15,10 @@ __pycache__/
 .dev.vars*
 !.dev.vars.example
 !.env.example
+
+# Local Agent instructions & skills (do not push to git)
+AGENTS.md
+SKILL.md
+agent.md
+.agents/
+

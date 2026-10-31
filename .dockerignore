@@ -1,0 +1,8 @@
+node_modules
+dist
+.dist
+.git
+.wrangler
+service/backend/.venv
+*.log
+.env.local

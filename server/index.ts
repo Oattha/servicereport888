@@ -1,10 +1,12 @@
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 import cors from "cors";
+import { createProxyMiddleware } from "http-proxy-middleware";
 import express from "express";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 import { pool } from "./db";
+import { autoMigrate } from "./autoMigrate";
 import { signToken, authMiddleware, adminOnly, type AuthRequest } from "./auth";
 import { companyNameSimilarity, normalizeBuildingName, normalizeCompanyName } from "./companyMatching";
 
@@ -25,6 +27,19 @@ app.use(
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: false,
+  })
+);
+
+// ส่งต่อ /service-api ไปยัง Python FastAPI (พอร์ต 8001 หรือตามที่คอนฟิก)
+const serviceApiTarget = process.env.SERVICE_API_TARGET || "http://127.0.0.1:8001";
+app.use(
+  "/service-api",
+  createProxyMiddleware({
+    target: serviceApiTarget,
+    changeOrigin: true,
+    pathRewrite: {
+      "^/service-api": "",
+    },
   })
 );
 
@@ -933,6 +948,16 @@ app.post("/api/upload", authMiddleware, upload.single("file"), async (req, res) 
 });
 
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`API server running on port ${port}`);
-});
+async function startServer() {
+  try {
+    await autoMigrate();
+  } catch (error) {
+    console.error("--> [Server Warning] การเชื่อมต่อหรือ Auto-migration ฐานข้อมูลล้มเหลว:", error);
+  }
+
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`API server running on port ${port}`);
+  });
+}
+
+startServer();

@@ -246,7 +246,14 @@ def initialize_database():
 @app.on_event("startup")
 async def startup_database():
     try:
-        initialize_database()
+        for attempt in range(1, 6):
+            try:
+                initialize_database()
+                break
+            except Exception as error:
+                print(f"--> [Database Warning] Attempt {attempt}/5 failed: {error}")
+                if attempt < 5:
+                    await asyncio.sleep(2)
     except Exception as error:
         print(f"--> [Database Warning] {error}")
 

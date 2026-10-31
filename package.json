@@ -12,7 +12,8 @@
     "start": "tsx server/index.ts",
     "db:init": "tsx server/initDb.ts",
     "build": "vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1094.0",
@@ -48,6 +49,7 @@
     "vite": "^6.0.7"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.66.0",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
@@ -59,6 +61,7 @@
     "concurrently": "^9.2.1",
     "postcss": "^8.5.8",
     "tailwindcss": "^3.4.19",
-    "tsx": "^4.23.0"
+    "tsx": "^4.23.0",
+    "wrangler": "^4.156.0"
   }
 }
